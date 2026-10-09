@@ -1,10 +1,10 @@
 // Mapa de navegación (según el diagrama de DropFlexAds Ops). Cada sección tiene pestañas; la primera es la página por defecto.
 export const SECCIONES = [
   { id: 'hoy', etiqueta: 'Hoy', items: [
-    { href: '/', titulo: 'Dashboard', desc: 'Resumen: ¿gano o pierdo?' },
+    { href: '/', icono: 'home', titulo: 'Dashboard', desc: 'Resumen: ¿gano o pierdo?' },
   ] },
   { id: 'campanas', etiqueta: 'Campañas', items: [
-    { href: '/campanas', titulo: 'Campañas', desc: 'Tus campañas y su resultado', tabs: [
+    { href: '/campanas', icono: 'chart', titulo: 'Campañas', desc: 'Tus campañas y su resultado', tabs: [
       { slug: '', titulo: 'Campañas' },
       { slug: 'pedidos', titulo: 'Pedidos' },
       { slug: 'creativos', titulo: 'Creativos' },
@@ -12,24 +12,24 @@ export const SECCIONES = [
     ] },
   ] },
   { id: 'dinero', etiqueta: 'Dinero', items: [
-    { href: '/contabilidad', titulo: 'Contabilidad', desc: 'Lo que entra y lo que sale, con datos reales', tabs: [
+    { href: '/contabilidad', icono: 'coin', titulo: 'Contabilidad', desc: 'Lo que entra y lo que sale, con datos reales', tabs: [
       { slug: '', titulo: 'Ganancia por día' },
       { slug: 'costo-por-venta', titulo: 'Costo por venta' },
       { slug: 'a-donde-va-mi-plata', titulo: 'A dónde va mi plata' },
       { slug: 'cuando-recupero', titulo: 'Cuándo recupero' },
       { slug: 'caja', titulo: 'Caja' },
     ] },
-    { href: '/cuentas', titulo: 'Mis cuentas', desc: 'Dropi y Meta, conectados y al día', tabs: [
+    { href: '/cuentas', icono: 'wallet', titulo: 'Mis cuentas', desc: 'Dropi y Meta, conectados y al día', tabs: [
       { slug: '', titulo: 'Dropi · Billetera' },
       { slug: 'dropi-tarjeta', titulo: 'Dropi · Tarjeta' },
       { slug: 'meta-ads', titulo: 'Meta Ads' },
     ] },
   ] },
   { id: 'herramientas', etiqueta: 'Herramientas', items: [
-    { href: '/calculadora', titulo: 'Calculadora', desc: 'Simula tus números antes de montar pauta para asegurar tu rentabilidad.' },
+    { href: '/calculadora', icono: 'percent', titulo: 'Calculadora', desc: 'Simula tus números antes de montar pauta para asegurar tu rentabilidad.' },
   ] },
   { id: 'config', etiqueta: 'Configuración', items: [
-    { href: '/configuracion', titulo: 'Configuración', desc: 'Cuenta de Meta y herramientas mensuales', tabs: [
+    { href: '/configuracion', icono: 'box', titulo: 'Configuración', desc: 'Cuenta de Meta y herramientas mensuales', tabs: [
       { slug: '', titulo: 'Cuenta de Meta' },
       { slug: 'herramientas', titulo: 'Herramientas de operación' },
     ] },

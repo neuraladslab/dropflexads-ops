@@ -114,7 +114,7 @@ function Rentabilidad() {
               <div><dt>CPA máximo</dt><dd className="num">{cop(MODO_RAPIDO.cpaMax)}</dd></div>
               <div><dt>Precio de venta</dt><dd>Costo total × 2,5 <span className="muted">(se calcula solo)</span></dd></div>
             </dl>
-            <p className="muted" style={{ marginTop: 14, fontSize: 14 }}>La calculadora rápida usa valores típicos de la guía. Cambia a completa para poner los tuyos.</p>
+            <p className="muted only-learner" style={{ marginTop: 14, fontSize: 14 }}>La calculadora rápida usa valores típicos de la guía. Cambia a completa para poner los tuyos.</p>
           </>
         )}
       </div>
@@ -224,7 +224,7 @@ function Escalado() {
             <Campo id="s-margin" etiqueta="Ganancia por venta" valor={m.margenPorVenta} onChange={set('margenPorVenta')} />
           </div>
         </div>
-        <p className="muted" style={{ marginTop: 20, fontSize: 14 }}>Con estas cuatro cifras calculamos la salud de tu campaña y cuánto puedes subir el presupuesto sin quemar plata. Cuando las campañas estén conectadas, estos números se cargarán solos.</p>
+        <p className="muted only-learner" style={{ marginTop: 20, fontSize: 14 }}>Con estas cuatro cifras calculamos la salud de tu campaña y cuánto puedes subir el presupuesto sin quemar plata. Cuando las campañas estén conectadas, estos números se cargarán solos.</p>
       </div>
       <div className="live"><ResultadoEscalado m={m} o={o} /></div>
     </div>
