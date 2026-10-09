@@ -53,3 +53,26 @@ test("ganancia: veredicto y retorno por peso gastado en Meta", () => {
   assert.equal(resultado(676000, costos).veredicto, "equilibrio");
   assert.ok(Math.abs(resultado(675388, costos).retornoPorPesoEnMeta! - 1) < 1e-9);
 });
+
+import { entradaRapida, rentabilidad, incrementoPorRoas, escalado } from "./calculadora.ts";
+
+test("calculadora: ejemplo de la guía (producto 18.000, PVP 79.900, devoluciones 15 %)", () => {
+  const r = rentabilidad({ costoProducto: 18000, flete: 14000, comision: 2500, precioVenta: 79900, devolucionesPct: 15, cpaMax: 20000 });
+  assert.equal(r.costo, 34500);
+  assert.equal(r.bruto, 45400);
+  assert.equal(Math.round(r.colchon), 6810);
+  assert.equal(Math.round(r.real), 38590);
+  assert.equal(r.presupuestoDiario, 20000); // mínimo de $20.000
+  assert.equal(r.gananciaNeta, 18590);
+  assert.equal(r.rentable, true);
+});
+test("calculadora: modo rápido vende a 2,5× el costo operativo", () => {
+  assert.equal(entradaRapida(18000).precioVenta, 86250); // ceil((18000+14000+2500) × 2,5)
+});
+test("escalado: incrementos por ROAS y condiciones para escalar", () => {
+  assert.deepEqual([1.9, 2, 2.5, 3, 4].map(incrementoPorRoas), [0, 25, 50, 75, 100]);
+  const e = escalado({ presupuesto: 30000, cpa: 20000, ventasPorDia: 2, margenPorVenta: 38900, cpaMax: 20000, diasRegistrados: 3 }, 19);
+  assert.equal(e.puedeEscalar, true);
+  assert.ok(e.roas > 2 && e.roas < 2.2);
+  assert.equal(escalado({ presupuesto: 30000, cpa: 20000, ventasPorDia: 2, margenPorVenta: 38900, diasRegistrados: 2 }, 19).puedeEscalar, false); // faltan días
+});
