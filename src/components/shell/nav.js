@@ -19,7 +19,7 @@ export const SECCIONES = [
       { slug: 'cuando-recupero', titulo: 'Cuándo recupero' },
       { slug: 'caja', titulo: 'Caja' },
     ] },
-    { href: '/fuentes', titulo: 'Fuentes de datos', desc: 'Dropi y Meta Ads', tabs: [
+    { href: '/cuentas', titulo: 'Mis cuentas', desc: 'Dropi y Meta, conectados y al día', tabs: [
       { slug: '', titulo: 'Dropi · Billetera' },
       { slug: 'dropi-tarjeta', titulo: 'Dropi · Tarjeta' },
       { slug: 'meta-ads', titulo: 'Meta Ads' },
