@@ -26,7 +26,7 @@ export const SECCIONES = [
     ] },
   ] },
   { id: 'herramientas', etiqueta: 'Herramientas', items: [
-    { href: '/calculadora', titulo: 'Calculadora', desc: 'Rentabilidad y escalado' },
+    { href: '/calculadora', titulo: 'Calculadora', desc: 'Simula tus números antes de montar pauta para asegurar tu rentabilidad.' },
   ] },
   { id: 'config', etiqueta: 'Configuración', items: [
     { href: '/configuracion', titulo: 'Configuración', desc: 'Cuenta de Meta y herramientas mensuales', tabs: [
