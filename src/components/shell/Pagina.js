@@ -20,7 +20,7 @@ export function Pagina({ item, slug, children }) {
 /** Estado honesto de una pantalla que aún no tiene datos: qué mostrará y de dónde saldrán. */
 export function Pendiente({ titulo, queMuestra, fuente, fase }) {
   return (
-    <div className="card" style={{ maxWidth: 760 }}>
+    <div className="card">
       <span className="chip idle">En construcción · {fase}</span>
       <h2 style={{ margin: '12px 0 6px', fontSize: 20 }}>{titulo}</h2>
       <p style={{ margin: '0 0 10px' }}>{queMuestra}</p>
