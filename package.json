@@ -18,7 +18,8 @@
     "auth:unlock": "node --env-file=.env.local scripts/auth-unlock.mjs",
     "auth:2fa-reset": "node --env-file=.env.local scripts/auth-2fa-reset.mjs",
     "security:audit": "npm audit --omit=dev",
-    "security:smoke": "node --env-file=.env.local scripts/security-smoke.mjs"
+    "security:smoke": "node --env-file=.env.local scripts/security-smoke.mjs",
+    "captura": "node scripts/captura.mjs"
   },
   "dependencies": {
     "jose": "^6.2.12",
@@ -35,6 +36,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
+    "playwright": "^1.64.0",
     "typescript": "^5"
   },
   "type": "module"
