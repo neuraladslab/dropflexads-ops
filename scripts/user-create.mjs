@@ -1,7 +1,7 @@
 // Crea un usuario (no hay registro público). Uso: npm run user:create
-import { hashPassword } from '../lib/auth/password.mjs'
-import { validatePassword } from '../lib/auth/policy.mjs'
-import { BREACH_MESSAGE, breachCount } from '../lib/auth/breach.mjs'
+import { hashPassword } from '../src/lib/auth/password.mjs'
+import { validatePassword } from '../src/lib/auth/policy.mjs'
+import { BREACH_MESSAGE, breachCount } from '../src/lib/auth/breach.mjs'
 import { connect, credentials } from './_auth-cli.mjs'
 
 const sql = connect()

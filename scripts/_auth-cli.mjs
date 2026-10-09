@@ -1,7 +1,7 @@
 // Utilidades comunes de los scripts de usuarios (interactivos y sin dejar contraseñas en el historial).
 import readline from 'node:readline'
 import postgres from 'postgres'
-import { sslOptions } from '../lib/dbssl.mjs'
+import { sslOptions } from '../src/lib/dbssl.mjs'
 
 export function connect() {
   if (!process.env.POSTGRES_URL) {

@@ -1,7 +1,7 @@
 // Cambia la contraseña de un usuario y CIERRA todas sus sesiones. Uso: npm run user:passwd
-import { hashPassword } from '../lib/auth/password.mjs'
-import { validatePassword } from '../lib/auth/policy.mjs'
-import { BREACH_MESSAGE, breachCount } from '../lib/auth/breach.mjs'
+import { hashPassword } from '../src/lib/auth/password.mjs'
+import { validatePassword } from '../src/lib/auth/policy.mjs'
+import { BREACH_MESSAGE, breachCount } from '../src/lib/auth/breach.mjs'
 import { connect, credentials } from './_auth-cli.mjs'
 
 const sql = connect()

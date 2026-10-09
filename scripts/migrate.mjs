@@ -1,7 +1,7 @@
 // Aplica database/schema.sql (idempotente: solo CREATE ... IF NOT EXISTS).
 // Uso: npm run db:migrate   (carga POSTGRES_URL desde .env.local)
 import postgres from 'postgres'
-import { sslOptions } from '../lib/dbssl.mjs'
+import { sslOptions } from '../src/lib/dbssl.mjs'
 import { readFileSync } from 'node:fs'
 
 const url = process.env.POSTGRES_URL
