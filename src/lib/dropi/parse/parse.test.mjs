@@ -8,3 +8,21 @@ test('payRefOf saca el código de pago de la descripción del banco', () => {
   assert.equal(payRefOf('Compra sin código'), '')
   assert.equal(payRefOf(''), '')
 })
+
+import { parseOrdersJson } from './pedidos.mjs'
+
+test('parseOrdersJson: estado, devolución, productos y sin datos del cliente', () => {
+  const r = parseOrdersJson(JSON.stringify({ objects: [
+    { id: 111, status: 'DEVOLUCION', shipping_guide: 'ABC123456', total_order: 79900, created_at: '2026-09-22T10:00:00Z', client_name: 'Secreto', phone: '300',
+      servientrega_movements: [{ nom_mov: 'DEVOLUCION AL REMITENTE', created_at: '2026-09-28T09:00:00Z' }],
+      orderdetails: [{ product: { id: 555, name: 'Gafas' } }, { product: { id: 555, name: 'Gafas' } }] },
+    { id: 112, status: 'ENTREGADO', total_order: 50000, servientrega_movements: [{ nom_mov: 'ENTREGADO', created_at: '2026-09-26T12:00:00Z' }], orderdetails: [] },
+  ] }))
+  assert.equal(r.rows.length, 2)
+  assert.equal(r.rows[0].status, 'DEVOLUCION')
+  assert.equal(r.rows[0].returned, '2026-09-28')
+  assert.deepEqual(r.rows[0].productIds, ['555'])
+  assert.equal(r.rows[0].guide, '123456')
+  assert.equal(r.rows[1].delivered, '2026-09-26')
+  assert.ok(!JSON.stringify(r.rows).includes('Secreto')) // nada del cliente
+})

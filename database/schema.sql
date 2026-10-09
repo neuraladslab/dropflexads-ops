@@ -183,3 +183,24 @@ CREATE TABLE IF NOT EXISTS wallet_movements (
 );
 CREATE INDEX IF NOT EXISTS idx_wallet_movements_owner_date ON wallet_movements (owner_id, tx_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wallet_movements_order ON wallet_movements (owner_id, order_ref);
+
+-- Pedidos de Dropi (TODOS los estados; el estado real decide la contabilidad). NO guarda datos del cliente (nombre, teléfono, dirección) ni facturas.
+-- product_ids = IDs de producto de Dropi del pedido: con ellos se atribuye el pedido a una campaña (por producto).
+CREATE TABLE IF NOT EXISTS dropi_orders (
+  id SERIAL PRIMARY KEY,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  order_id VARCHAR(30) NOT NULL,             -- ID del pedido en Dropi
+  guide VARCHAR(40),
+  status VARCHAR(30) NOT NULL,               -- estado crudo de Dropi (texto libre)
+  status_group VARCHAR(12) NOT NULL DEFAULT 'otro' CHECK (status_group IN ('entregado', 'devolucion', 'novedad', 'transito', 'pendiente', 'otro')),
+  product VARCHAR(200),
+  product_ids TEXT[] NOT NULL DEFAULT '{}',
+  total NUMERIC(14,2),
+  created_date DATE,
+  delivered_date DATE,
+  returned_date DATE,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (owner_id, order_id)
+);
+CREATE INDEX IF NOT EXISTS idx_dropi_orders_owner_created ON dropi_orders (owner_id, created_date DESC);
+CREATE INDEX IF NOT EXISTS idx_dropi_orders_owner_group ON dropi_orders (owner_id, status_group);

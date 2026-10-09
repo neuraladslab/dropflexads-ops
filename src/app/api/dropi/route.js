@@ -10,6 +10,7 @@ import { connectDropi } from '@/lib/dropi/session'
 import { syncCardTransactions } from '@/lib/dropi/sync'
 import { syncWalletMovements } from '@/lib/dropi/wallet-sync'
 import { syncCardBalance } from '@/lib/dropi/balance-sync'
+import { syncOrders } from '@/lib/dropi/orders-sync'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -68,7 +69,8 @@ export const POST = guard(async (request, _ctx, session) => {
     if (action === 'reset_card' && r.ok) await logActivity(uid, r.replaced ? `Reiniciaste la tarjeta: se borró lo guardado y se cargaron ${r.inserted} movimientos desde ${CARD_START}` : 'Intentaste reiniciar la tarjeta pero Dropi no devolvió movimientos: no se borró nada')
     const balance = r.ok ? await syncCardBalance(uid, { ip }) : null // el saldo que informa Dropi: la fuente de verdad del disponible
     const wallet = r.ok ? await syncWalletMovements(uid, { ip }) : null
-    return ok(wallet ? { ...r, balance, wallet } : r)
+    const orders = r.ok ? await syncOrders(uid, { ip }) : null // el estado real de cada pedido (entregado, devolución…), con la misma sesión
+    return ok(wallet ? { ...r, balance, wallet, orders } : r)
   }
 
   // Primero lo barato (validar el cuerpo); la contraseña de la app usa scrypt (caro) y va después.

@@ -1,0 +1,84 @@
+import 'server-only'
+// Sincroniza los pedidos de Dropi de TODOS los estados (GET /api/orders/myorders/v2) con la misma sesión que ya usa la tarjeta: sin un inicio de sesión extra.
+// El estado real (entregado, devolución, en tránsito…) viene de Dropi: es lo que decide cuándo hay ganancia. Una petición a la vez y con pausa.
+// De cada pedido solo se guarda lo mínimo (orden, guía, estado, producto, valor, fechas):
+// nada del cliente (nombre, teléfono, dirección) ni las facturas en PDF que Dropi manda dentro de la respuesta.
+import sql from '@/lib/db'
+import { parseOrdersJson } from './parse/pedidos.mjs'
+import { grupoEstado } from '@/domain/estadoPedido.ts'
+import { logActivity } from '@/lib/activity'
+import { hoyBogota, sumarDias } from '@/domain/fechas.ts'
+import { PAGE_DELAY_MS } from './config.mjs'
+import { DropiError, dropiRequest } from './client'
+import { getToken, recordReadFailure } from './session'
+import { syncWalletRange } from './wallet-sync'
+
+const BUDGET_MS = 40_000 // deja margen bajo los 60 s de la función
+const ORDERS_PAGE = 25, MAX_ORDER_PAGES = 12, WINDOW_DAYS = 90 // la ventana es por fecha de CREACIÓN del pedido; un pedido puede entregarse o devolverse semanas después
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const jitter = () => PAGE_DELAY_MS[0] + Math.random() * (PAGE_DELAY_MS[1] - PAGE_DELAY_MS[0])
+const EMPTY = /"objects"\s*:\s*\[\s*\]/
+const userIdOf = (jwt) => { try { const s = JSON.parse(Buffer.from(String(jwt).split('.')[1], 'base64url').toString('utf8')).sub; return /^\d{1,12}$/.test(String(s)) ? String(s) : '' } catch { return '' } }
+const coDay = (offset = 0) => sumarDias(hoyBogota(), offset)
+
+export async function importOrderRows(uid, rows) {
+  const data = rows.map((r) => ({ owner_id: uid, order_id: r.orderId, guide: r.guide || null, status: r.status, status_group: grupoEstado(r.status), product: r.product || null, product_ids: r.productIds || [], total: r.total, created_date: r.created, delivered_date: r.delivered, returned_date: r.returned }))
+  if (!data.length) return { inserted: 0, updated: 0 }
+  let inserted = 0, updated = 0
+  await sql.begin(async (tx) => {
+    for (let i = 0; i < data.length; i += 200) {
+      const out = await tx`INSERT INTO dropi_orders ${tx(data.slice(i, i + 200), 'owner_id', 'order_id', 'guide', 'status', 'status_group', 'product', 'product_ids', 'total', 'created_date', 'delivered_date', 'returned_date')}
+        ON CONFLICT (owner_id, order_id) DO UPDATE SET guide = EXCLUDED.guide, status = EXCLUDED.status, status_group = EXCLUDED.status_group, product = EXCLUDED.product, product_ids = EXCLUDED.product_ids, total = EXCLUDED.total,
+          created_date = EXCLUDED.created_date, delivered_date = COALESCE(EXCLUDED.delivered_date, dropi_orders.delivered_date), returned_date = COALESCE(EXCLUDED.returned_date, dropi_orders.returned_date), synced_at = NOW()
+        RETURNING (xmax = 0) AS fresh`
+      for (const o of out) o.fresh ? inserted++ : updated++
+    }
+  })
+  return { inserted, updated }
+}
+
+/** → { ok, pages, read, inserted, updated, window, error? }. Nunca lanza por errores de Dropi. */
+export async function syncOrders(uid, { ip = '' } = {}) {
+  const win = { from: coDay(-WINDOW_DAYS), to: coDay(0) }, rows = [], seen = new Set()
+  let pages = 0, read = 0
+  const t0 = Date.now()
+  try {
+    const token = await getToken(uid, { ip })
+    const userId = userIdOf(token)
+    if (!userId) throw new DropiError('unexpected', 'No pude identificar tu usuario de Dropi para leer los pedidos. Vuelve a conectar la cuenta.')
+    for (let start = 0, n = 0; n < MAX_ORDER_PAGES && Date.now() - t0 < BUDGET_MS; start += ORDERS_PAGE, n++) {
+      await sleep(jitter())
+      const path = `/api/orders/myorders/v2?exportAs=orderByRow&orderBy=id&orderDirection=desc&result_number=${ORDERS_PAGE}&start=${start}&textToSearch=&status=&supplier_id=false&user_id=${userId}&from=${win.from}&until=${win.to}&filter_product=undefined&haveIncidenceProcesamiento=false&tag_id=&warranty=false&seller=undefined&filter_date_by=FECHA%20DE%20CREADO&invoiced=null`
+      const r = await dropiRequest('GET', path, { token })
+      if (r.status === 401) throw new DropiError('blocked', 'Dropi no aceptó la sesión para leer los pedidos. Vuelve a sincronizar.')
+      if (r.status !== 200) throw new DropiError('unexpected', 'Dropi respondió algo inesperado al leer los pedidos.', { status: r.status })
+      if (EMPTY.test(r.text)) break
+      const p = parseOrdersJson(r.text)
+      if (p.error) throw new DropiError('unexpected', 'No se pudo leer la lista de pedidos.')
+      pages++; read += p.total
+      for (const x of p.rows) if (!seen.has(x.orderId)) { seen.add(x.orderId); rows.push(x) }
+      if (p.total < ORDERS_PAGE) break
+    }
+    const imp = await importOrderRows(uid, rows)
+    // Si hay pedidos entregados ANTES de lo que cubre la billetera sincronizada, se lee la billetera de ese rango: así se sabe si los pagaron (y no se queda en «no verificable»).
+    let backfill = null
+    const [cov] = await sql`SELECT (SELECT MIN(delivered_date)::text FROM dropi_orders WHERE owner_id = ${uid} AND status = 'ENTREGADO') AS oldest, (SELECT MIN(tx_date)::text FROM wallet_movements WHERE owner_id = ${uid}) AS wfrom`
+    if (cov.oldest && (!cov.wfrom || cov.oldest < cov.wfrom) && Date.now() - t0 < BUDGET_MS - 10_000) {
+      const to = cov.wfrom || coDay(0), earliest = coDay(-90), from = cov.oldest < earliest ? earliest : cov.oldest
+      try {
+        backfill = { from, to, ...(await syncWalletRange(uid, token, from, to)) }
+        // Lo consultado sin error cuenta como cubierto aunque ese rango no tuviera movimientos: se guarda hasta dónde llega la cobertura.
+        await sql`INSERT INTO app_settings (owner_id, key, value) VALUES (${uid}, 'wallet_cover_from', ${from}) ON CONFLICT (owner_id, key) DO UPDATE SET value = LEAST(app_settings.value, EXCLUDED.value)`
+      } catch (e) { backfill = { from, to, error: e instanceof DropiError ? e.message : 'No se pudo leer la billetera de ese rango.' } }
+    }
+    if (imp.inserted) await logActivity(uid, `Trajiste ${imp.inserted} pedidos nuevos de Dropi`)
+    // Diagnóstico: cuántos pedidos hay por estado crudo de Dropi (para ver si algún estado nuevo cae en «otro»).
+    const estados = {}
+    for (const x of rows) estados[x.status] = (estados[x.status] || 0) + 1
+    return { ok: true, pages, read, inserted: imp.inserted, updated: imp.updated, window: win, backfill, estados }
+  } catch (e) {
+    if (e instanceof DropiError) { await recordReadFailure(uid, e); return { ok: false, pages, read, inserted: 0, updated: 0, window: win, error: { code: e.code, message: e.message } } }
+    console.error('[dropi] pedidos', e && (e.code || e.name))
+    return { ok: false, pages, read, inserted: 0, updated: 0, window: win, error: { code: 'unexpected', message: 'No se pudieron traer los pedidos.' } }
+  }
+}

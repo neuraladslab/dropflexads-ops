@@ -76,3 +76,31 @@ test("escalado: incrementos por ROAS y condiciones para escalar", () => {
   assert.ok(e.roas > 2 && e.roas < 2.2);
   assert.equal(escalado({ presupuesto: 30000, cpa: 20000, ventasPorDia: 2, margenPorVenta: 38900, diasRegistrados: 2 }, 19).puedeEscalar, false); // faltan días
 });
+
+import { grupoEstado } from "./estadoPedido.ts";
+import { clasificarPedidos } from "./pedidos.ts";
+
+test("estados de Dropi por palabra clave (con tildes, mayúsculas y variantes)", () => {
+  assert.equal(grupoEstado("ENTREGADO"), "entregado");
+  assert.equal(grupoEstado("Devolución al remitente"), "devolucion");
+  assert.equal(grupoEstado("DEVOLUCION"), "devolucion");
+  assert.equal(grupoEstado("RECLAMO EN OFICINA"), "novedad");
+  assert.equal(grupoEstado("EN REPARTO"), "transito");
+  assert.equal(grupoEstado("GUIA_GENERADA"), "pendiente");
+  assert.equal(grupoEstado("algo nuevo de Dropi"), "otro");
+  assert.equal(grupoEstado(null), "otro");
+});
+test("pedidos: pagado, sin pagar, no verificable, devuelto y en curso", () => {
+  const pedidos = [
+    { idPedido: "1", estado: "ENTREGADO", entregadoDia: "2026-09-25" },
+    { idPedido: "2", guia: "G2", estado: "ENTREGADO", entregadoDia: "2026-09-26" },
+    { idPedido: "3", estado: "ENTREGADO", entregadoDia: "2026-09-27" },
+    { idPedido: "4", estado: "ENTREGADO", entregadoDia: "2026-09-01" },
+    { idPedido: "5", estado: "DEVOLUCION" },
+    { idPedido: "6", estado: "DEVOLUCION" },
+    { idPedido: "7", estado: "EN REPARTO" },
+  ];
+  const r = clasificarPedidos(pedidos, [{ idPedido: "1" }, { guia: "G2" }], [{ idPedido: "6" }], "2026-09-21", "2026-10-02");
+  assert.deepEqual(r.map((p) => p.contable), ["pagado", "pagado", "sin_pagar", "no_verificable", "devuelto", "devuelto_cobrado", "en_curso"]);
+  assert.equal(r[2].dias, 5);
+});
