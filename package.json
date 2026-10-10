@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test src/domain/domain.test.ts src/lib/dropi/parse/parse.test.mjs",
+    "test": "node --test src/domain/domain.test.ts src/lib/dropi/parse/parse.test.mjs src/lib/meta/parse.test.mjs",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "auth:init": "node scripts/auth-init.mjs",
     "auth:secret": "node scripts/auth-init.mjs --print",

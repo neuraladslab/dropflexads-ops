@@ -12,9 +12,10 @@ export const KIND_LABEL = {
 /**
  * Tipo de movimiento según el código de Dropi (`identification_code`), que es lo único que Dropi garantiza; la descripción solo sirve de respaldo.
  * Códigos vistos en datos reales: 1002 ganancia de un pedido · 1038 salida por recarga de la tarjeta · 1102 «servicio de dispersión» (comisión de esa recarga, 0.4 %)
+ * · 1031 transferencia de la billetera a otro usuario (p. ej. el pago a una herramienta como ChatePro: cuenta como inversión en herramientas) · 1000 salida por nueva orden con pago anticipado (compra de un pedido que el cliente ya pagó: NO es inversión)
  * · 1045 mantenimiento mensual de la tarjeta · 1068 recarga de la billetera por pasarela de pago (plata tuya del banco, no una ganancia) · 1014 cobro de devolución por entrega no efectiva · 1020 retiro de saldo a tu banco.
  */
-export const KIND_BY_CODE = { 1002: 'profit', 1038: 'to_card', 1102: 'recharge_fee', 1045: 'card_fee', 1068: 'wallet_topup', 1014: 'return_fee', 1020: 'withdrawal' }
+export const KIND_BY_CODE = { 1002: 'profit', 1038: 'to_card', 1102: 'recharge_fee', 1045: 'card_fee', 1068: 'wallet_topup', 1014: 'return_fee', 1020: 'withdrawal', 1031: 'transfer_out', 1000: 'order_payment' }
 export const kindByCode = (code) => KIND_BY_CODE[String(code || '').trim()] || null
 
 /** Un movimiento de `historywallet` → fila normalizada, o { error }. */

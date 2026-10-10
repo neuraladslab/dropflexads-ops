@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Icono } from '@/components/shell/Icono'
+import Dialogo from '@/components/Dialogo'
 import { diaCorto } from '@/lib/formato'
 
 // Mismo diseño que el panel de Dropi de la app original: tarjeta horizontal a todo el ancho (estado a la izquierda, botones a la derecha),
@@ -33,22 +33,6 @@ function Campo({ id, etiqueta, ayuda, ...props }) {
       <div className="inp"><input id={id} {...props} /></div>
       {ayuda && <span className="muted" style={{ fontSize: 13, marginTop: 6, display: 'block' }}>{ayuda}</span>}
     </div>
-  )
-}
-
-/** Diálogo modal (mismo marco que los diálogos de la app original). */
-function Dialogo({ etiqueta, onCerrar, children }) {
-  useEffect(() => {
-    const f = (e) => { if (e.key === 'Escape') onCerrar() }
-    window.addEventListener('keydown', f)
-    return () => window.removeEventListener('keydown', f)
-  }, [onCerrar])
-  // En el nivel raíz de la página (como los diálogos de la app original): el fondo cubre menú y barra superior.
-  return createPortal(
-    <div className="pal-bg" onMouseDown={(e) => { if (e.target === e.currentTarget) onCerrar() }}>
-      <div className="pal" role="dialog" aria-label={etiqueta} style={{ padding: 30, maxHeight: '92vh', overflow: 'auto' }}>{children}</div>
-    </div>,
-    document.body,
   )
 }
 
@@ -128,7 +112,7 @@ function Resultado({ r }) {
         <div className="card"><div className="kpi-l">Tarjeta</div><div className="kpi-v">{r.inserted ?? 0}</div><div className="muted" style={{ fontSize: 13 }}>movimientos nuevos{r.updated ? ` · ${r.updated} actualizados` : ''}{r.window ? ` (${r.window.from} a ${r.window.to})` : ''}</div></div>
         <div className="card"><div className="kpi-l">Saldo de la tarjeta</div><div className="kpi-v">{r.balance && r.balance.ok ? cop(r.balance.amount) : '—'}</div><div className="muted" style={{ fontSize: 13 }}>según Dropi</div></div>
         <div className="card"><div className="kpi-l">Billetera</div><div className="kpi-v">{r.wallet && r.wallet.ok !== false ? (r.wallet.inserted ?? 0) : '—'}</div><div className="muted" style={{ fontSize: 13 }}>movimientos nuevos</div></div>
-        <div className="card"><div className="kpi-l">Pedidos</div><div className="kpi-v">{r.orders && r.orders.ok ? r.orders.read : '—'}</div><div className="muted" style={{ fontSize: 13 }}>{r.orders && r.orders.ok ? `${r.orders.inserted} nuevos · ${r.orders.updated} actualizados` : r.orders && r.orders.error ? r.orders.error.message : ''}</div></div>
+        <div className="card"><div className="kpi-l">Pedidos</div><div className="kpi-v">{r.orders && r.orders.ok ? r.orders.read : '—'}</div><div className="muted" style={{ fontSize: 13 }}>{r.orders && r.orders.ok ? `${r.orders.inserted} nuevos · ${r.orders.updated} actualizados${r.orders.omitidos ? ` · ${r.orders.omitidos} omitidos (${r.orders.canceladas ? `${r.orders.canceladas} cancelados` : 'anteriores al inicio'})` : ''}` : r.orders && r.orders.error ? r.orders.error.message : ''}</div></div>
       </div>
       {estados.length > 0 && (
         <div className="card" style={{ marginTop: 14 }}>

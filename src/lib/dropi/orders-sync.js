@@ -1,20 +1,22 @@
 import 'server-only'
-// Sincroniza los pedidos de Dropi de TODOS los estados (GET /api/orders/myorders/v2) con la misma sesión que ya usa la tarjeta: sin un inicio de sesión extra.
+// Sincroniza los pedidos de Dropi de TODOS los estados, menos los CANCELADOS y los anteriores al inicio de la operación (GET /api/orders/myorders/v2) con la misma sesión que ya usa la tarjeta: sin un inicio de sesión extra.
 // El estado real (entregado, devolución, en tránsito…) viene de Dropi: es lo que decide cuándo hay ganancia. Una petición a la vez y con pausa.
 // De cada pedido solo se guarda lo mínimo (orden, guía, estado, producto, valor, fechas):
 // nada del cliente (nombre, teléfono, dirección) ni las facturas en PDF que Dropi manda dentro de la respuesta.
 import sql from '@/lib/db'
 import { parseOrdersJson, ordersPath } from './parse/pedidos.mjs'
-import { grupoEstado } from '@/domain/estadoPedido.ts'
+import { grupoEstado, esCancelado, seImporta } from '@/domain/estadoPedido.ts'
 import { logActivity } from '@/lib/activity'
 import { hoyBogota, sumarDias } from '@/domain/fechas.ts'
+import { calcularVentana, dentroDeOperacion } from '@/domain/ventana.ts'
+import { inicioOperacion } from '@/lib/inicio'
 import { PAGE_DELAY_MS } from './config.mjs'
 import { DropiError, dropiRequest, inesperado } from './client'
 import { getToken, recordReadFailure } from './session'
 import { syncWalletRange } from './wallet-sync'
 
 const BUDGET_MS = 40_000 // deja margen bajo los 60 s de la función
-const ORDERS_PAGE = 25, MAX_ORDER_PAGES = 12, WINDOW_DAYS = 90 // la ventana es por fecha de CREACIÓN del pedido; un pedido puede entregarse o devolverse semanas después
+const ORDERS_PAGE = 25, MAX_ORDER_PAGES = 12 // la ventana es por fecha de CREACIÓN del pedido y parte del inicio de la operación: lo anterior no cuenta
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const jitter = () => PAGE_DELAY_MS[0] + Math.random() * (PAGE_DELAY_MS[1] - PAGE_DELAY_MS[0])
 const EMPTY = /"objects"\s*:\s*\[\s*\]/
@@ -22,13 +24,13 @@ const userIdOf = (jwt) => { try { const s = JSON.parse(Buffer.from(String(jwt).s
 const coDay = (offset = 0) => sumarDias(hoyBogota(), offset)
 
 export async function importOrderRows(uid, rows) {
-  const data = rows.map((r) => ({ owner_id: uid, order_id: r.orderId, guide: r.guide || null, status: r.status, status_group: grupoEstado(r.status), product: r.product || null, product_ids: r.productIds || [], total: r.total, created_date: r.created, delivered_date: r.delivered, returned_date: r.returned }))
+  const data = rows.map((r) => ({ owner_id: uid, order_id: r.orderId, guide: r.guide || null, status: r.status, status_group: grupoEstado(r.status), product: r.product || null, product_ids: r.productIds || [], product_names: r.productNames || [], units: r.units ?? null, total: r.total, created_date: r.created, delivered_date: r.delivered, returned_date: r.returned }))
   if (!data.length) return { inserted: 0, updated: 0 }
   let inserted = 0, updated = 0
   await sql.begin(async (tx) => {
     for (let i = 0; i < data.length; i += 200) {
-      const out = await tx`INSERT INTO dropi_orders ${tx(data.slice(i, i + 200), 'owner_id', 'order_id', 'guide', 'status', 'status_group', 'product', 'product_ids', 'total', 'created_date', 'delivered_date', 'returned_date')}
-        ON CONFLICT (owner_id, order_id) DO UPDATE SET guide = EXCLUDED.guide, status = EXCLUDED.status, status_group = EXCLUDED.status_group, product = EXCLUDED.product, product_ids = EXCLUDED.product_ids, total = EXCLUDED.total,
+      const out = await tx`INSERT INTO dropi_orders ${tx(data.slice(i, i + 200), 'owner_id', 'order_id', 'guide', 'status', 'status_group', 'product', 'product_ids', 'product_names', 'units', 'total', 'created_date', 'delivered_date', 'returned_date')}
+        ON CONFLICT (owner_id, order_id) DO UPDATE SET guide = EXCLUDED.guide, status = EXCLUDED.status, status_group = EXCLUDED.status_group, product = EXCLUDED.product, product_ids = EXCLUDED.product_ids, product_names = EXCLUDED.product_names, units = EXCLUDED.units, total = EXCLUDED.total,
           created_date = EXCLUDED.created_date, delivered_date = COALESCE(EXCLUDED.delivered_date, dropi_orders.delivered_date), returned_date = COALESCE(EXCLUDED.returned_date, dropi_orders.returned_date), synced_at = NOW()
         RETURNING (xmax = 0) AS fresh`
       for (const o of out) o.fresh ? inserted++ : updated++
@@ -39,7 +41,8 @@ export async function importOrderRows(uid, rows) {
 
 /** → { ok, pages, read, inserted, updated, window, error? }. Nunca lanza por errores de Dropi. */
 export async function syncOrders(uid, { ip = '', win: ventana = null } = {}) {
-  const win = ventana || { from: coDay(-WINDOW_DAYS), to: coDay(0) }, rows = [], seen = new Set()
+  const inicio = await inicioOperacion(uid)
+  const win = ventana || calcularVentana({ hoy: coDay(0), inicioOperacion: inicio, hayDatos: false }), rows = [], seen = new Set(), omitidas = new Set(), canceladas = new Set()
   let pages = 0, read = 0
   const t0 = Date.now()
   try {
@@ -56,10 +59,20 @@ export async function syncOrders(uid, { ip = '', win: ventana = null } = {}) {
       const p = parseOrdersJson(r.text)
       if (p.error) throw new DropiError('unexpected', 'No se pudo leer la lista de pedidos.')
       pages++; read += p.total
-      for (const x of p.rows) if (!seen.has(x.orderId)) { seen.add(x.orderId); rows.push(x) }
+      for (const x of p.rows) {
+        if (seen.has(x.orderId)) continue
+        seen.add(x.orderId)
+        if (!dentroDeOperacion(x.created, inicio)) { omitidas.add(x.orderId); continue } // creado antes de empezar la operación
+        if (!seImporta(x.status)) { omitidas.add(x.orderId); if (esCancelado(x.status)) canceladas.add(x.orderId); continue } // los cancelados no se traen
+        rows.push(x)
+      }
       if (p.total < ORDERS_PAGE) break
     }
     const imp = await importOrderRows(uid, rows)
+    // Si un pedido que ya teníamos se canceló después, o es anterior al inicio de la operación, se quita.
+    const guardados = await sql`SELECT order_id, status, created_date::text AS creado FROM dropi_orders WHERE owner_id = ${uid}`
+    const quitar = [...new Set([...omitidas, ...guardados.filter((g) => !seImporta(g.status) || !dentroDeOperacion(g.creado, inicio)).map((g) => g.order_id)])]
+    if (quitar.length) await sql`DELETE FROM dropi_orders WHERE owner_id = ${uid} AND order_id = ANY(${quitar})`
     // Si hay pedidos entregados ANTES de lo que cubre la billetera sincronizada, se lee la billetera de ese rango: así se sabe si los pagaron (y no se queda en «no verificable»).
     let backfill = null
     const [cov] = await sql`SELECT (SELECT MIN(delivered_date)::text FROM dropi_orders WHERE owner_id = ${uid} AND status = 'ENTREGADO') AS oldest, (SELECT MIN(tx_date)::text FROM wallet_movements WHERE owner_id = ${uid}) AS wfrom`
@@ -75,7 +88,7 @@ export async function syncOrders(uid, { ip = '', win: ventana = null } = {}) {
     // Diagnóstico: cuántos pedidos hay por estado crudo de Dropi (para ver si algún estado nuevo cae en «otro»).
     const estados = {}
     for (const x of rows) estados[x.status] = (estados[x.status] || 0) + 1
-    return { ok: true, pages, read, inserted: imp.inserted, updated: imp.updated, window: win, backfill, estados }
+    return { ok: true, pages, read, inserted: imp.inserted, updated: imp.updated, window: win, backfill, estados, omitidos: omitidas.size, canceladas: canceladas.size }
   } catch (e) {
     if (e instanceof DropiError) {
       // Una respuesta «inesperada» a la consulta de pedidos es un problema de la consulta, no abuso: no se pone la conexión en pausa (bloquearía la tarjeta y la billetera).

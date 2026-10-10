@@ -662,3 +662,22 @@ a.ni{text-decoration:none}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
 .kpi-l{font-size:13px;color:var(--muted);font-weight:600}
 .kpi-v{font-family:var(--mono);font-weight:700;font-size:26px;margin-top:6px}
+
+/* ---- Billetera y tarjeta de Dropi (representación visual) ---- */
+.wlt-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:0 0 16px}
+.wlt-mid{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:110px;text-align:center}
+.wlt-mid .arrow{font-size:34px;line-height:1;color:var(--blue)}
+.wlt-mid b{font-family:var(--mono);font-size:17px}
+.wlt-mid span{font-size:12.5px;color:var(--muted)}
+.wlt{position:relative;flex:1;min-width:290px;max-width:440px;border-radius:22px;padding:22px 24px 74px;color:#fff;overflow:hidden;
+  background:linear-gradient(140deg,#0B1534 0%,#16307A 55%,#2563EB 120%);box-shadow:0 14px 30px -14px rgba(11,21,52,.7)}
+.wlt::before{content:"";position:absolute;right:-60px;top:-70px;width:210px;height:210px;border-radius:50%;background:rgba(255,255,255,.07)}
+.wlt::after{content:"";position:absolute;left:-40px;bottom:-90px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.05)}
+.wlt-top{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
+.wlt-ico{width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,.14);display:grid;place-items:center}
+.wlt-top b{font-size:16px;display:block;line-height:1.2}.wlt-top small{opacity:.72;font-size:12.5px}
+.wlt-lbl{position:relative;z-index:1;margin-top:22px;opacity:.8;font-size:13.5px}
+.wlt-big{position:relative;z-index:1;font-family:var(--mono);font-weight:700;font-size:36px;letter-spacing:-.02em;line-height:1.15}
+.wlt-pocket{position:absolute;left:0;right:0;bottom:0;height:54px;background:rgba(5,10,30,.42);border-top:1px solid rgba(255,255,255,.14);z-index:1;display:flex;align-items:center;gap:20px;padding:0 24px;font-size:13.5px}
+.wlt-pocket span b{font-family:var(--mono)}
+.wlt-clasp{margin-left:auto;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.55)}

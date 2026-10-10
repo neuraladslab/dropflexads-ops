@@ -1,15 +1,10 @@
 // Mapa de navegación (según el diagrama de DropFlexAds Ops). Cada sección tiene pestañas; la primera es la página por defecto.
 export const SECCIONES = [
   { id: 'hoy', etiqueta: 'Hoy', items: [
-    { href: '/', icono: 'home', titulo: 'Dashboard', desc: 'Resumen: ¿gano o pierdo?' },
+    { href: '/', icono: 'home', titulo: 'Dashboard', desc: '¿Cuándo recupero mi inversión?' },
   ] },
   { id: 'campanas', etiqueta: 'Campañas', items: [
-    { href: '/campanas', icono: 'chart', titulo: 'Campañas', desc: 'Tus campañas y su resultado', tabs: [
-      { slug: '', titulo: 'Campañas' },
-      { slug: 'pedidos', titulo: 'Pedidos' },
-      { slug: 'creativos', titulo: 'Creativos' },
-      { slug: 'escalar', titulo: 'Cuándo escalar' },
-    ] },
+    { href: '/campanas', icono: 'chart', titulo: 'Campañas', desc: 'Cada campaña con sus pedidos, creativos y cuándo escalar' },
   ] },
   { id: 'dinero', etiqueta: 'Dinero', items: [
     { href: '/contabilidad', icono: 'coin', titulo: 'Contabilidad', desc: 'Lo que entra y lo que sale, con datos reales', tabs: [

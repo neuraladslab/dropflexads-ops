@@ -6,6 +6,7 @@ import { parseWalletJson } from './parse/billetera.mjs'
 import { logActivity } from '@/lib/activity'
 import { PAGE_DELAY_MS } from './config.mjs'
 import { DropiError, dropiRequest, inesperado } from './client'
+import { walletPath } from './rutas.mjs'
 import { getToken, recordReadFailure } from './session'
 import { syncWindow } from './sync'
 
@@ -50,7 +51,7 @@ export async function syncWalletRange(uid, token, from, to) {
   const rows = [], seen = new Set()
   for (let start = 0, n = 0; n < MAX_WALLET_PAGES; start += WALLET_PAGE, n++) {
     await sleep(jitter())
-    const r = await dropiRequest('GET', `/api/historywallet?orderBy=id&orderDirection=desc&result_number=${WALLET_PAGE}&start=${start}&textToSearch=&type=null&id=null&identification_code=null&user_id=${userId}&from=${from}&until=${to}&wallet_id=0`, { token })
+    const r = await dropiRequest('GET', walletPath({ userId, start, from, until: to, size: WALLET_PAGE }), { token })
     if (r.status === 401) throw new DropiError('blocked', 'Dropi no aceptó la sesión para leer la billetera. Vuelve a sincronizar.')
     if (r.status !== 200) throw inesperado('la billetera', r)
     if (EMPTY.test(r.text)) break
@@ -73,7 +74,7 @@ export async function syncWalletMovements(uid, { ip = '', win: ventana = null } 
     if (!userId) throw new DropiError('unexpected', 'No pude identificar tu usuario de Dropi para leer la billetera. Vuelve a conectar la cuenta.')
     for (let start = 0, n = 0; n < MAX_WALLET_PAGES; start += WALLET_PAGE, n++) {
       await sleep(jitter()) // también antes de la primera: viene justo después de la última página de la tarjeta
-      const path = `/api/historywallet?orderBy=id&orderDirection=desc&result_number=${WALLET_PAGE}&start=${start}&textToSearch=&type=null&id=null&identification_code=null&user_id=${userId}&from=${win.from}&until=${win.to}&wallet_id=0`
+      const path = walletPath({ userId, start, from: win.from, until: win.to, size: WALLET_PAGE })
       const r = await dropiRequest('GET', path, { token })
       if (r.status === 401) throw new DropiError('blocked', 'Dropi no aceptó la sesión para leer la billetera. Vuelve a sincronizar.')
       if (r.status !== 200) throw inesperado('la billetera', r)

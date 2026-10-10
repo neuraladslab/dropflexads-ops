@@ -77,7 +77,7 @@ test("escalado: incrementos por ROAS y condiciones para escalar", () => {
   assert.equal(escalado({ presupuesto: 30000, cpa: 20000, ventasPorDia: 2, margenPorVenta: 38900, diasRegistrados: 2 }, 19).puedeEscalar, false); // faltan días
 });
 
-import { grupoEstado } from "./estadoPedido.ts";
+import { grupoEstado, esCancelado } from "./estadoPedido.ts";
 import { clasificarPedidos } from "./pedidos.ts";
 
 test("estados de Dropi por palabra clave (con tildes, mayúsculas y variantes)", () => {
@@ -105,7 +105,7 @@ test("pedidos: pagado, sin pagar, no verificable, devuelto y en curso", () => {
   assert.equal(r[2].dias, 5);
 });
 
-import { diaVacio, resumirDias, netoDelDia } from "./porDia.ts";
+import { diaVacio, resumirDias, netoDelDia, costoPorVenta, repartoDeCostos, costosDelDia } from "./porDia.ts";
 
 test("ganancia por día: suma de días y veredicto del período", () => {
   const d1 = { ...diaVacio("2026-09-25"), ganancia: 300000, meta: 200000, devoluciones: 20000 };
@@ -147,7 +147,7 @@ test("validarRango: mensajes claros", () => {
   assert.match(validarRango("2026-01-01", "2026-10-10", hoy)!, /120/);
 });
 
-import { validarInicio } from "./ventana.ts";
+import { validarInicio, dentroDeOperacion } from "./ventana.ts";
 
 test("validarInicio: fecha desde la que se sincroniza", () => {
   const hoy = "2026-10-10";
@@ -157,4 +157,177 @@ test("validarInicio: fecha desde la que se sincroniza", () => {
   assert.match(validarInicio("26/09/2026", hoy)!, /válida/);
   assert.match(validarInicio("2026-01-01", hoy)!, /120/);
   assert.match(validarInicio(undefined, hoy)!, /válida/);
+});
+
+test("costo por venta real y reparto de costos", () => {
+  const dias = [
+    { ...diaVacio("2026-09-26"), ganancia: 100000, meta: 40000, entregas: 2 },
+    { ...diaVacio("2026-09-27"), ganancia: 50000, meta: 20000, entregas: 1, devoluciones: 15000, otrosGastos: 5000 },
+  ];
+  const r = resumirDias(dias, 0);
+  const c = costoPorVenta(r.total, r.neto);
+  assert.equal(c.entregas, 3);
+  assert.equal(c.cpa, 20000); // 60.000 de Meta / 3 pedidos entregados
+  assert.equal(c.gananciaPorPedido, 50000);
+  assert.equal(c.quedaPorPedido, 30000);
+  assert.equal(c.netoPorPedido, 23333.33); // (150.000 − 80.000 de costos) / 3
+  const sinMeta = costoPorVenta({ ...r.total, meta: 0 }, r.neto);
+  assert.equal(sinMeta.cpa, null); // no se inventa: sin gasto de Meta identificado
+  assert.equal(costoPorVenta(diaVacio("x"), 0).gananciaPorPedido, null);
+  const rep = repartoDeCostos(costosDelDia(r.total), r.total.ganancia);
+  assert.deepEqual(rep.map((x) => x.nombre), ["Publicidad en Meta", "Devoluciones", "Otros gastos de la tarjeta"]);
+  assert.equal(rep[0].pctDelCosto, 75); // 60.000 de 80.000
+  assert.equal(rep[0].pctDeLaGanancia, 40);
+});
+
+import { recuperacion } from "./recuperacion.ts";
+
+test("recuperación de la inversión: porcentaje, lo que falta y la fecha estimada", () => {
+  const hoy = "2026-10-10";
+  const a = recuperacion(1000000, 400000, 50000, hoy); // faltan 600.000 a 50.000 por día → 12 días
+  assert.equal(a.estado, "en_camino"); assert.equal(a.pct, 40); assert.equal(a.faltan, 600000); assert.equal(a.dias, 12); assert.equal(a.fecha, "2026-10-22");
+  const b = recuperacion(1000000, 1250000, 10000, hoy); // ya la recuperó y va 250.000 por encima
+  assert.equal(b.estado, "recuperada"); assert.equal(b.pct, 100); assert.equal(b.excedente, 250000); assert.equal(b.faltan, 0);
+  const c = recuperacion(1000000, 400000, -20000, hoy); // gastando más de lo que entra: no se recupera a este ritmo
+  assert.equal(c.estado, "sin_ritmo"); assert.equal(c.dias, null); assert.equal(c.fecha, null);
+  assert.equal(recuperacion(0, 0, 0, hoy).estado, "sin_datos");
+  assert.equal(recuperacion(1000000, 999999.5, 100000, hoy).pct, 99); // nunca redondea hacia arriba un 99,9 %
+});
+
+test("pagos a herramientas desde la billetera cuentan como Herramientas; la nueva orden con pago anticipado no es costo", () => {
+  const d = { ...diaVacio("2026-10-07"), ganancia: 200000, meta: 50000, pagosHerramientas: 136558 };
+  const r = resumirDias([d], 3000);
+  assert.equal(costosDelDia(d, 3000).herramientas, 139558); // 3.000 fijos del día + 136.558 de la transferencia
+  assert.equal(r.costos, 50000 + 139558);
+  const rep = repartoDeCostos(costosDelDia(r.total, r.herramientas), r.total.ganancia);
+  assert.equal(rep.find((x) => x.nombre === "Herramientas")!.monto, 139558);
+});
+
+import { atribuir, resumenPorCampana } from "./campanas.ts";
+
+test("campañas: el pedido va a la primera campaña con alguno de sus productos; si no, «sin campaña»", () => {
+  const camps = [{ id: "A", productIds: ["10", "11"] }, { id: "B", productIds: ["11", "20"] }];
+  const a = atribuir([
+    { idPedido: "1", productIds: ["10"] }, { idPedido: "2", productIds: ["20"] }, { idPedido: "3", productIds: ["11"] }, // 11 está en A y B: gana A (la más antigua)
+    { idPedido: "4", productIds: ["99"] }, { idPedido: "5", productIds: [] },
+  ], camps);
+  assert.deepEqual([...a.entries()], [["1", "A"], ["2", "B"], ["3", "A"], ["4", null], ["5", null]]);
+});
+test("campañas: resultado por campaña con la ganancia real y la tasa de devolución", () => {
+  const ped = [
+    { idPedido: "1", contable: "pagado" }, { idPedido: "2", contable: "pagado" }, { idPedido: "3", contable: "sin_pagar" },
+    { idPedido: "4", contable: "devuelto_cobrado" }, { idPedido: "5", contable: "en_curso" }, { idPedido: "6", contable: "pagado" },
+  ];
+  const asig = new Map<string, string | null>([["1", "A"], ["2", "A"], ["3", "A"], ["4", "A"], ["5", "A"], ["6", null]]);
+  const m = resumenPorCampana(ped, asig, new Map([["1", 50000], ["2", 40000], ["6", 30000]]), new Map([["4", 15000]]));
+  const A = m.get("A")!;
+  assert.deepEqual([A.pedidos, A.entregados, A.pagados, A.sinPagar, A.devueltos, A.enCurso], [5, 3, 2, 1, 1, 1]);
+  assert.equal(A.ganancia, 90000); assert.equal(A.costoDevoluciones, 15000);
+  assert.equal(A.tasaDevolucion, 25); // 1 devuelto de 4 que ya terminaron
+  assert.equal(m.get("sin")!.ganancia, 30000);
+  assert.equal(m.get("sin")!.tasaDevolucion, 0);
+});
+
+test("pedidos cancelados: se detectan con cualquier variante y no se confunden con devoluciones", () => {
+  for (const e of ["CANCELADO", "Cancelada", "PEDIDO CANCELADO POR EL CLIENTE", "cancelación", "CANCELED"]) assert.equal(esCancelado(e), true, e);
+  assert.equal(grupoEstado("CANCELADO"), "cancelado");
+  for (const e of ["ENTREGADO", "DEVOLUCION AL REMITENTE", "RECHAZADO", "EN REPARTO", "GUIA_GENERADA", "", null]) assert.equal(esCancelado(e), false, String(e));
+  assert.equal(grupoEstado("RECHAZADO"), "devolucion"); // lo rechazado sigue siendo plata perdida
+});
+
+import { seImporta } from "./estadoPedido.ts";
+
+test("se importan todos los pedidos menos los cancelados", () => {
+  for (const e of ["ENTREGADO", "DEVOLUCION AL REMITENTE", "RECHAZADO", "EN REPARTO", "GUIA_GENERADA", "PENDIENTE CONFIRMACION", "RECLAMO EN OFICINA", "EN TRANSITO", "algo nuevo", "", null]) assert.equal(seImporta(e), true, String(e));
+  for (const e of ["CANCELADO", "Cancelada", "PEDIDO CANCELADO POR EL CLIENTE"]) assert.equal(seImporta(e), false, e);
+});
+
+test("estados reales de Dropi: todo entra salvo CANCELADO; las entregas a la transportadora siguen en curso", () => {
+  const real = ["ENTREGADO", "DEVOLUCION", "RECHAZADO", "ENTREGADA A CONEXIONES", "RECLAME EN OFICINA", "EN PROCESAMIENTO", "PREPARADO PARA TRANSPORTADORA", "EN BODEGA ORIGEN", "NOVEDAD", "REENVÍO", "PENDIENTE", "GUIA_GENERADA"];
+  for (const e of real) assert.equal(seImporta(e), true, e);
+  assert.equal(seImporta("CANCELADO"), false);
+  assert.equal(grupoEstado("ENTREGADA A CONEXIONES"), "transito"); // no es entrega al cliente final
+  assert.equal(grupoEstado("RECLAME EN OFICINA"), "novedad");
+});
+
+test("lo anterior al inicio de la operación no cuenta (un pedido del 9 de agosto con inicio 21/09)", () => {
+  assert.equal(dentroDeOperacion("2026-08-09", "2026-09-21"), false);
+  assert.equal(dentroDeOperacion("2026-09-20", "2026-09-21"), false);
+  assert.equal(dentroDeOperacion("2026-09-21", "2026-09-21"), true);
+  assert.equal(dentroDeOperacion("2026-10-02", "2026-09-21"), true);
+  assert.equal(dentroDeOperacion(null, "2026-09-21"), true);
+});
+
+import { combosVendidos } from "./combos.ts";
+
+test("combos: ventas, precio, facturado y ganancia real por unidades del pedido", () => {
+  const p = [
+    { idPedido: "1", unidades: 1, total: 89900, contable: "pagado", creado: "2026-10-01" },
+    { idPedido: "2", unidades: 1, total: 89900, contable: "pagado", creado: "2026-10-02" },
+    { idPedido: "3", unidades: 1, total: 79900, contable: "sin_pagar", creado: "2026-10-03" }, // entregado pero aún sin ganancia en la billetera
+    { idPedido: "4", unidades: 2, total: 129900, contable: "pagado", creado: "2026-10-02" },
+    { idPedido: "5", unidades: 2, total: 129900, contable: "devuelto", creado: "2026-10-02" }, // devuelto: no es venta
+    { idPedido: "6", unidades: null, total: 50000, contable: "pagado" }, // sin cantidad: no se puede ubicar
+    { idPedido: "7", unidades: 3, total: 169900, contable: "en_curso" }, // en camino: no es venta todavía
+  ];
+  const r = combosVendidos(p, new Map([["1", 49900], ["2", 49900], ["4", 64900], ["6", 1000]]));
+  assert.deepEqual(r.filas.map((f) => [f.unidades, f.ventas, f.pctVentas]), [[1, 3, 75], [2, 1, 25]]);
+  assert.equal(r.filas[0].precio, 89900); // el precio más frecuente (2 de 3)
+  assert.equal(r.filas[0].facturado, 259700);
+  assert.equal(r.filas[0].gananciaTotal, 99800); assert.equal(r.filas[0].conGanancia, 2); assert.equal(r.filas[0].gananciaPorVenta, 49900); // el sin pagar no promedia
+  assert.equal(r.filas[1].gananciaPorVenta, 64900);
+  assert.deepEqual(r.total, { ventas: 4, facturado: 389600, gananciaTotal: 164700, conGanancia: 3, gananciaPorVenta: 54900 });
+  assert.equal(r.sinCantidad, 1);
+  assert.deepEqual(combosVendidos([], new Map()).filas, []);
+});
+
+import { flujoPorDia } from "./billetera.ts";
+
+test("billetera: lo que entra y lo que sale cada día, por tipo (la billetera es de paso)", () => {
+  const dias = flujoPorDia([
+    { dia: "2026-10-02", kind: "wallet_topup", direction: "in", monto: 50000 },
+    { dia: "2026-10-02", kind: "to_card", direction: "out", monto: 50000 },
+    { dia: "2026-10-01", kind: "profit", direction: "in", monto: 40000 },
+    { dia: "2026-10-01", kind: "profit", direction: "in", monto: 12000 },
+    { dia: "2026-10-01", kind: "return_fee", direction: "out", monto: 14000 },
+    { dia: "2026-10-01", kind: "recharge_fee", direction: "out", monto: 200 },
+    { dia: "2026-10-01", kind: "withdrawal", direction: "out", monto: 5000 },
+  ]);
+  assert.deepEqual(dias.map((d) => d.dia), ["2026-10-01", "2026-10-02"]); // ascendente
+  assert.deepEqual(dias[0].entra, { ganancia: 52000, propia: 0, otros: 0 });
+  assert.deepEqual(dias[0].sale, { tarjeta: 0, descuentos: 14200, retiros: 5000 });
+  assert.equal(dias[0].totalEntra, 52000); assert.equal(dias[0].totalSale, 19200);
+  assert.deepEqual([dias[1].entra.propia, dias[1].sale.tarjeta, dias[1].totalEntra, dias[1].totalSale], [50000, 50000, 50000, 50000]);
+});
+
+test("cruce de respaldo: un cobro de Meta sin referencia se empareja por monto y fecha (0,3 % de diferencia, un día después)", () => {
+  const tarjeta = [
+    { id: "a", tipo: "cargo" as const, estado: "aprobado" as const, monto: 52428, fecha: "2026-10-02" },
+    { id: "b", tipo: "cargo" as const, estado: "aprobado" as const, monto: 35000, fecha: "2026-10-02" }, // otra cosa
+    { id: "c", tipo: "cargo" as const, estado: "aprobado" as const, monto: 32390, fecha: "2026-09-29" },
+    { id: "d", tipo: "cargo" as const, estado: "aprobado" as const, monto: 32390, fecha: "2026-09-29" },
+  ];
+  const cobros = [
+    { id: "1", fecha: "2026-10-01", monto: 52271, estado: "pagado" as const }, // → a
+    { id: "2", fecha: "2026-09-29", monto: 32300, estado: "pagado" as const }, // → c
+    { id: "3", fecha: "2026-09-29", monto: 32300, estado: "pagado" as const }, // → d (cada cargo se usa una sola vez)
+    { id: "4", fecha: "2026-09-20", monto: 99999, estado: "pagado" as const }, // sin cargo parecido
+  ];
+  const r = cruzar(tarjeta, cobros);
+  assert.deepEqual(r.meta.map((m) => m.id).sort(), ["a", "c", "d"]);
+  assert.deepEqual(r.porMonto.map((m) => m.id).sort(), ["a", "c", "d"]);
+  assert.deepEqual(r.otros.map((m) => m.id), ["b"]); // los 35.000 no se parecen a ningún cobro: siguen siendo «otro gasto»
+  assert.deepEqual(r.cobrosSinTarjeta.map((c) => c.id), ["4"]);
+  // fuera de la ventana de fechas o de la tolerancia, no se empareja
+  assert.equal(cruzar([{ id: "x", tipo: "cargo", estado: "aprobado", monto: 52428, fecha: "2026-10-12" }], [{ id: "9", fecha: "2026-10-01", monto: 52271, estado: "pagado" }]).meta.length, 0);
+  assert.equal(cruzar([{ id: "x", tipo: "cargo", estado: "aprobado", monto: 60000, fecha: "2026-10-02" }], [{ id: "9", fecha: "2026-10-01", monto: 52271, estado: "pagado" }]).meta.length, 0);
+});
+test("cruce: la referencia de pago manda; el respaldo solo toca cobros sin referencia", () => {
+  const r = cruzar(
+    [{ id: "a", tipo: "cargo", estado: "aprobado", monto: 100000, refPago: "PZ4XV8SWF4", fecha: "2026-10-02" }, { id: "b", tipo: "cargo", estado: "aprobado", monto: 100000, fecha: "2026-10-02" }],
+    [{ id: "1", fecha: "2026-10-01", monto: 100000, refPago: "PZ4XV8SWF4", estado: "pagado" }, { id: "2", fecha: "2026-10-01", monto: 100000, refPago: "OTRA000000", estado: "pagado" }],
+  );
+  assert.deepEqual(r.meta.map((m) => m.id), ["a"]); // el cobro 2 trae su referencia y esa no existe en la tarjeta: no se fuerza por monto
+  assert.deepEqual(r.porMonto, []);
+  assert.deepEqual(r.cobrosSinTarjeta.map((c) => c.id), ["2"]);
 });

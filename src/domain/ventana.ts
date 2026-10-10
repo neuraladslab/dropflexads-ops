@@ -42,6 +42,9 @@ export function validarRango(from: unknown, to: unknown, hoy: string): string | 
   return null;
 }
 
+/** ¿Esta fecha (YYYY-MM-DD) cae dentro de la operación? Lo anterior a la fecha de inicio no cuenta. Sin fecha no se puede juzgar: se deja pasar. */
+export const dentroDeOperacion = (fecha: string | null | undefined, inicio: string) => !fecha || fecha >= inicio;
+
 /** Valida la fecha desde la que se sincronizan los datos de Dropi (tarjeta y billetera). Devuelve el mensaje de error, o null si está bien. */
 export function validarInicio(from: unknown, hoy: string): string | null {
   if (typeof from !== "string" || !FECHA.test(from)) return "Escribe una fecha válida.";

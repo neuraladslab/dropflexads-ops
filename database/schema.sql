@@ -215,3 +215,62 @@ CREATE TABLE IF NOT EXISTS fixed_costs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_fixed_costs_owner ON fixed_costs (owner_id);
+
+-- Nombre de cada producto del pedido (alineado con product_ids) para poder elegirlos al crear una campaña.
+ALTER TABLE dropi_orders ADD COLUMN IF NOT EXISTS product_names TEXT[] NOT NULL DEFAULT '{}';
+
+-- Campañas: agrupan productos de Dropi. Un pedido se atribuye a la primera campaña (la más antigua) que tenga alguno de sus productos.
+-- meta_campaign_id queda para unir con la campaña de Meta Ads cuando se conecte.
+CREATE TABLE IF NOT EXISTS campaigns (
+  id SERIAL PRIMARY KEY,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  product_ids TEXT[] NOT NULL DEFAULT '{}',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  meta_campaign_id VARCHAR(40),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_campaigns_owner ON campaigns (owner_id, created_at);
+
+-- Unidades de cada pedido (1x, 2x, 3x…): suma de la cantidad de sus productos. Con esto se arma «Lo vendido por combo».
+ALTER TABLE dropi_orders ADD COLUMN IF NOT EXISTS units INTEGER;
+
+-- ============================================================
+-- Meta Ads (Marketing API oficial, solo lectura). El token se guarda CIFRADO (AES-256-GCM, ligado al usuario y al campo) y no vuelve al navegador.
+CREATE TABLE IF NOT EXISTS meta_connections (
+  owner_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  ad_account_id VARCHAR(40) NOT NULL,          -- act_123…
+  account_name VARCHAR(120),
+  currency VARCHAR(8),
+  timezone VARCHAR(60),
+  token_enc TEXT NOT NULL,
+  token_hint VARCHAR(12),                      -- «…a1b2» para reconocerlo sin descifrar
+  vat_pct NUMERIC(5,2) NOT NULL DEFAULT 19,    -- IVA que Meta cobra encima del gasto
+  api_version VARCHAR(10) NOT NULL DEFAULT 'v23.0',
+  state VARCHAR(10) NOT NULL DEFAULT 'ok' CHECK (state IN ('ok', 'reauth', 'error')),
+  sync_started_at TIMESTAMPTZ,
+  last_sync_at TIMESTAMPTZ,
+  last_sync_ok_at TIMESTAMPTZ,
+  last_error VARCHAR(200),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Gasto diario por campaña de Meta (insights). El gasto de Meta viene SIN IVA.
+CREATE TABLE IF NOT EXISTS meta_spend_daily (
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  meta_campaign_id VARCHAR(40) NOT NULL,
+  campaign_name VARCHAR(200),
+  spend NUMERIC(14,2) NOT NULL DEFAULT 0,
+  impressions BIGINT NOT NULL DEFAULT 0,
+  clicks BIGINT NOT NULL DEFAULT 0,
+  purchases INTEGER NOT NULL DEFAULT 0,
+  purchase_value NUMERIC(14,2) NOT NULL DEFAULT 0,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (owner_id, day, meta_campaign_id)
+);
+CREATE INDEX IF NOT EXISTS idx_meta_spend_owner_day ON meta_spend_daily (owner_id, day DESC);
+
+-- Los cobros de Meta (con IVA incluido) pueden venir de la API o de otro origen; la referencia de pago es opcional (si no llega, el cruce con la tarjeta usa monto y fecha).
+ALTER TABLE meta_charges ADD COLUMN IF NOT EXISTS source VARCHAR(10) NOT NULL DEFAULT 'manual';

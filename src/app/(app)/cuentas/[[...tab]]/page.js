@@ -1,8 +1,8 @@
 import { crearPagina } from '@/components/shell/crearPagina'
-import { Pendiente } from '@/components/shell/Pagina'
 import ConexionDropi from '@/components/ConexionDropi'
-import { VistaBilletera, VistaTarjeta } from '@/components/datos/Vistas'
-import { datosBilletera, datosTarjeta } from '@/lib/datos'
+import PanelMeta from '@/components/PanelMeta'
+import { VistaBilletera, VistaTarjeta, VistaMeta } from '@/components/datos/Vistas'
+import { datosBilletera, datosTarjeta, datosMeta } from '@/lib/datos'
 import { usuarioActual } from '@/lib/sesion'
 
 export const metadata = { title: 'Mis cuentas · DropFlexAds Ops' }
@@ -11,5 +11,5 @@ export const metadata = { title: 'Mis cuentas · DropFlexAds Ops' }
 export default crearPagina('/cuentas', {
   '': async () => (<><ConexionDropi /><VistaBilletera d={await datosBilletera(await usuarioActual())} /></>),
   'dropi-tarjeta': async () => (<><ConexionDropi /><VistaTarjeta d={await datosTarjeta(await usuarioActual())} /></>),
-  'meta-ads': { titulo: 'Meta Ads', queMuestra: 'Gasto diario por campaña, cobros y facturas, y KPIs (CPM, CTR, CPC), todo por la API oficial de Meta en modo lectura.', fuente: 'Marketing API oficial de Meta (proyecto meta-ads).', fase: 'Fase 2' },
+  'meta-ads': async () => (<><PanelMeta /><VistaMeta d={await datosMeta(await usuarioActual())} /></>),
 })

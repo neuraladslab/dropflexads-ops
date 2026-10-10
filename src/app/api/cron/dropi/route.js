@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import sql from '@/lib/db'
 import { sincronizarTodo } from '@/lib/dropi/sync-all'
 import { logActivity } from '@/lib/activity'
+import { sincronizarMeta } from '@/lib/meta/sync'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,7 @@ const igual = (a, b) => { const x = Buffer.from(a), y = Buffer.from(b); return x
  * No usa sesión de usuario (el proxy deja pasar esta ruta); el secreto es lo único que la protege. Sin CRON_SECRET configurado, responde 401 siempre.
  * Solo sincroniza cuentas que pueden entrar solas: modo automático (se guarda la clave del autenticador) o con una sesión de Dropi todavía vigente.
  * Las demás se omiten y queda anotado en la bitácora: en modo «código a mano» el servidor no puede iniciar sesión sin ti.
+ * Después sincroniza Meta (gasto y cobros) de quien lo tenga conectado.
  */
 export async function GET(request) {
   const secret = process.env.CRON_SECRET
@@ -42,5 +44,12 @@ export async function GET(request) {
       resultado.push({ usuario: c.owner_id, ok: false, error: 'error inesperado' })
     }
   }
-  return Response.json({ at: new Date().toISOString(), usuarios: resultado.length, resultado })
+  // Meta no necesita código ni sesión: el token guardado basta, así que corre solo cada noche (si el token venció, queda anotado en la conexión).
+  const metas = await sql`SELECT owner_id FROM meta_connections WHERE state <> 'reauth' ORDER BY owner_id`
+  const meta = []
+  for (const m of metas) {
+    try { const r = await sincronizarMeta(m.owner_id); meta.push({ usuario: m.owner_id, ok: !!r.ok, gasto: r.gasto ? r.gasto.filas : null, cobros: r.cobros ? r.cobros.nuevos : null, error: r.ok ? undefined : r.error && r.error.message }) }
+    catch (e) { console.error('[cron meta]', e && (e.code || e.name)); meta.push({ usuario: m.owner_id, ok: false, error: 'error inesperado' }) }
+  }
+  return Response.json({ at: new Date().toISOString(), usuarios: resultado.length, resultado, meta })
 }

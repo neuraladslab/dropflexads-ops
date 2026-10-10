@@ -4,6 +4,7 @@ import 'server-only'
 import { MAX_RESPONSE_BYTES, REQUEST_TIMEOUT_MS, dropiBase } from './config.mjs'
 import { dropiHeaders } from './headers.mjs'
 import { motivoDropi } from './parse/errores.mjs'
+import { rutaPermitida } from './rutas.mjs'
 
 export class DropiError extends Error {
   // code: reauth | cooldown | blocked | network | unexpected | no_connection | busy
@@ -25,16 +26,6 @@ export function inesperado(paso, r) {
   return new DropiError('unexpected', `Dropi respondió algo inesperado al leer ${paso} (HTTP ${r.status}${m ? ': ' + m : ''}).`, { status: r.status })
 }
 
-const ALLOWED = [
-  /^\/api\/login$/,
-  /^\/api\/credit-cards\/list-card-transactions\/car_[A-Za-z0-9]{8,40}\/\d{1,4}\/\d{1,3}$/,
-  // Saldo disponible de la tarjeta: lo informa Dropi, no se calcula.
-  /^\/api\/credit-cards\/balances\/car_[A-Za-z0-9]{8,40}$/,
-  // Billetera: la misma consulta que hace la pantalla de Dropi (solo lectura, parámetros fijos salvo página, usuario y fechas).
-  /^\/api\/historywallet\?orderBy=id&orderDirection=desc&result_number=\d{1,3}&start=\d{1,6}&textToSearch=&type=null&id=null&identification_code=null&user_id=\d{1,12}&from=\d{4}-\d{2}-\d{2}&until=\d{4}-\d{2}-\d{2}&wallet_id=0$/,
-  // Pedidos ENTREGADOS (solo lectura, parámetros fijos salvo página, usuario y fechas): se usan para ver cuáles ya te pagaron.
-  /^\/api\/orders\/myorders\/v2\?exportAs=orderByRow&orderBy=id&orderDirection=desc&result_number=\d{1,3}&start=\d{1,6}&textToSearch=&status=ENTREGADO&supplier_id=false&user_id=\d{1,12}&from=\d{4}-\d{2}-\d{2}&until=\d{4}-\d{2}-\d{2}&filter_product=undefined&haveIncidenceProcesamiento=false&tag_id=&warranty=false&seller=undefined&filter_date_by=FECHA%20DE%20CREADO&invoiced=null$/,
-]
 const WAF = /captcha|cloudflare|access denied|request blocked|attention required|incapsula|akamai/i
 
 async function readCapped(res) {
@@ -54,7 +45,7 @@ async function readCapped(res) {
 
 /** → { status, text }. Lanza DropiError('blocked'|'network'|'unexpected'). Una respuesta 401 NO lanza: quien llama decide si renueva la sesión. */
 export async function dropiRequest(method, path, { token = '', body } = {}) {
-  if (!ALLOWED.some((re) => re.test(path))) throw new DropiError('unexpected', 'Ruta de Dropi no permitida.')
+  if (!rutaPermitida(path)) throw new DropiError('unexpected', 'Ruta de Dropi no permitida.')
   const headers = dropiHeaders({
     'x-authorization': token ? 'Bearer ' + token : 'Bearer undefined',
     'x-captcha-token': '',
