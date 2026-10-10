@@ -10,7 +10,7 @@ import { importCardRows } from './card-import'
 import { logActivity } from '@/lib/activity'
 import { MAX_IMPORT, todayCO } from '@/lib/util'
 import { getSetting } from '@/lib/settings'
-import { CARD_ID_RE, MAX_PAGES_PER_SYNC, MIN_SYNC_INTERVAL_S, PAGE_DELAY_MS, PAGE_SIZE, SYNC_BUDGET_MS, WINDOW_DAYS } from './config.mjs'
+import { CARD_ID_RE, CARD_START, MAX_PAGES_PER_SYNC, MIN_SYNC_INTERVAL_S, PAGE_DELAY_MS, PAGE_SIZE, SYNC_BUDGET_MS, WINDOW_DAYS } from './config.mjs'
 import { DropiError, dropiRequest } from './client'
 import { dec, getToken, invalidateToken, recordReadFailure } from './session'
 
@@ -26,8 +26,8 @@ const msg = (e) => (e instanceof DropiError ? { code: e.code, message: e.message
 
 /** Ventana de la sincronización: { from, to } en ISO (7 días antes de hoy hasta hoy, hora de Colombia). */
 export const syncWindow = async (uid) => {
-  // Con «Mi operación» definida, la ventana empieza el día en que empezó tu operación (con un tope de 120 días); sin ella, los últimos 7 días.
-  const to = todayCO(), op = await getSetting(uid, 'op_from'), floor = daysBefore(to, 120)
+  // La ventana empieza el día en que empezó tu operación (ajuste `op_from`; por defecto, cuando empezó a funcionar la tarjeta), con un tope de 120 días.
+  const to = todayCO(), op = (await getSetting(uid, 'op_from')) || CARD_START, floor = daysBefore(to, 120)
   return { from: op && op <= to ? (op < floor ? floor : op) : daysBefore(to, WINDOW_DAYS), to }
 }
 

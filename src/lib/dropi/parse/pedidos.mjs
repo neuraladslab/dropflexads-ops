@@ -37,3 +37,16 @@ export function parseOrdersJson(text) {
   }
   return { rows, errors, total: list.length }
 }
+
+/**
+ * Ruta de la lista de pedidos de Dropi (todos los estados). IMPORTANTE: Dropi espera el texto «null» en `status` y `seller` (así lo consulta DropFlex App);
+ * un `status=` vacío lo rechaza con una respuesta inesperada.
+ */
+export function ordersPath({ userId, start, from, until, size = 25 }) {
+  const q = new URLSearchParams({
+    exportAs: 'orderByRow', orderBy: 'id', orderDirection: 'desc', result_number: String(size), start: String(start), textToSearch: '',
+    status: 'null', supplier_id: 'false', user_id: String(userId), from, until, filter_product: 'undefined', haveIncidenceProcesamiento: 'false',
+    tag_id: '', warranty: 'false', seller: 'null', filter_date_by: 'FECHA DE CREADO', invoiced: 'null',
+  })
+  return '/api/orders/myorders/v2?' + q.toString()
+}

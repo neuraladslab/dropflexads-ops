@@ -4,7 +4,7 @@ import 'server-only'
 // De cada pedido solo se guarda lo mínimo (orden, guía, estado, producto, valor, fechas):
 // nada del cliente (nombre, teléfono, dirección) ni las facturas en PDF que Dropi manda dentro de la respuesta.
 import sql from '@/lib/db'
-import { parseOrdersJson } from './parse/pedidos.mjs'
+import { parseOrdersJson, ordersPath } from './parse/pedidos.mjs'
 import { grupoEstado } from '@/domain/estadoPedido.ts'
 import { logActivity } from '@/lib/activity'
 import { hoyBogota, sumarDias } from '@/domain/fechas.ts'
@@ -48,7 +48,7 @@ export async function syncOrders(uid, { ip = '' } = {}) {
     if (!userId) throw new DropiError('unexpected', 'No pude identificar tu usuario de Dropi para leer los pedidos. Vuelve a conectar la cuenta.')
     for (let start = 0, n = 0; n < MAX_ORDER_PAGES && Date.now() - t0 < BUDGET_MS; start += ORDERS_PAGE, n++) {
       await sleep(jitter())
-      const path = `/api/orders/myorders/v2?exportAs=orderByRow&orderBy=id&orderDirection=desc&result_number=${ORDERS_PAGE}&start=${start}&textToSearch=&status=&supplier_id=false&user_id=${userId}&from=${win.from}&until=${win.to}&filter_product=undefined&haveIncidenceProcesamiento=false&tag_id=&warranty=false&seller=undefined&filter_date_by=FECHA%20DE%20CREADO&invoiced=null`
+      const path = ordersPath({ userId, start, from: win.from, until: win.to, size: ORDERS_PAGE })
       const r = await dropiRequest('GET', path, { token })
       if (r.status === 401) throw new DropiError('blocked', 'Dropi no aceptó la sesión para leer los pedidos. Vuelve a sincronizar.')
       if (r.status !== 200) throw new DropiError('unexpected', 'Dropi respondió algo inesperado al leer los pedidos.', { status: r.status })
