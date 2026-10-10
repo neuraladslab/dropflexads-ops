@@ -19,7 +19,9 @@
     "auth:2fa-reset": "node --env-file=.env.local scripts/auth-2fa-reset.mjs",
     "security:audit": "npm audit --omit=dev",
     "security:smoke": "node --env-file=.env.local scripts/security-smoke.mjs",
-    "captura": "node scripts/captura.mjs"
+    "captura": "node scripts/captura.mjs",
+    "lint:undef": "eslint --rule '{\"no-undef\":\"error\"}' src/lib src/app/api scripts",
+    "verificar": "tsc --noEmit && npm run lint:undef && npm test"
   },
   "dependencies": {
     "jose": "^6.2.12",

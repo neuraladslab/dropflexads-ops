@@ -12,7 +12,7 @@ import { MAX_IMPORT, todayCO } from '@/lib/util'
 import { getSetting } from '@/lib/settings'
 import { calcularVentana } from '@/domain/ventana.ts'
 import { diaBogota } from '@/domain/fechas.ts'
-import { CARD_ID_RE, MAX_PAGES_PER_SYNC, MIN_SYNC_INTERVAL_S, PAGE_DELAY_MS, PAGE_SIZE, SYNC_BUDGET_MS, WINDOW_DAYS } from './config.mjs'
+import { CARD_ID_RE, OPERACION_INICIO, MAX_PAGES_PER_SYNC, MIN_SYNC_INTERVAL_S, PAGE_DELAY_MS, PAGE_SIZE, SYNC_BUDGET_MS, WINDOW_DAYS } from './config.mjs'
 import { DropiError, dropiRequest } from './client'
 import { dec, getToken, invalidateToken, recordReadFailure } from './session'
 
@@ -71,8 +71,15 @@ export async function syncCardTransactions(uid, { budgetMs = SYNC_BUDGET_MS, ip 
     const wait = c.last_sync_at ? Math.max(1, Math.ceil(MIN_SYNC_INTERVAL_S - (Date.now() - new Date(c.last_sync_at).getTime()) / 1000)) : 5
     return { ok: false, skipped: true, error: { code: 'busy', message: 'Ya se está sincronizando o se sincronizó hace un momento. Espera un poco.', seconds: wait } }
   }
-  const cardId = dec(uid, 'card', claim[0].card_id_enc)
-  const win = await syncWindow(uid, { from, to, full: full || replace }) // «reiniciar» siempre parte del inicio de la operación
+  // Con la sincronización ya reservada, cualquier fallo antes de empezar a leer debe SOLTAR la reserva: si no, la pantalla queda «sincronizando» hasta que venza el candado.
+  let cardId, win
+  try {
+    cardId = dec(uid, 'card', claim[0].card_id_enc)
+    win = await syncWindow(uid, { from, to, full: full || replace }) // «reiniciar» siempre parte del inicio de la operación
+  } catch (e) {
+    await sql`UPDATE dropi_connections SET sync_started_at = NULL WHERE owner_id = ${uid}`
+    throw e
+  }
   // Dropi fecha los movimientos de la tarjeta en hora UTC: después de las 7 p. m. en Colombia ya llevan la fecha de MAÑANA. Sin este día de margen,
   // una recarga o un cobro de la noche se descartaba por «pasar de hoy» y nunca entraba.
   const cardWin = { from: win.from, to: daysBefore(win.to, -1) }
