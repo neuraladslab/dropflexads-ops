@@ -243,5 +243,5 @@ export async function recordReadFailure(uid, e) {
   const s = blocked ? BLOCK_BACKOFF_S[Math.min(n - 1, BLOCK_BACKOFF_S.length - 1)] : netSeconds(n)
   e.seconds = s; e.recorded = true
   await sql`UPDATE dropi_connections SET state = ${blocked ? 'blocked' : 'cooldown'}, fail_count = ${n}, cooldown_until = NOW() + make_interval(secs => ${s}),
-            ${blocked ? sql`token_enc = NULL, token_exp = NULL,` : sql``} last_error = ${(blocked ? friendly.blocked : friendly[e.code] || friendly.unexpected)}, updated_at = NOW() WHERE owner_id = ${uid}`
+            ${blocked ? sql`token_enc = NULL, token_exp = NULL,` : sql``} last_error = ${(blocked ? friendly.blocked : e.code === 'unexpected' && e.message ? String(e.message).slice(0, 160) : friendly[e.code] || friendly.unexpected)}, updated_at = NOW() WHERE owner_id = ${uid}`
 }

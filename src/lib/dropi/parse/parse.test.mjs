@@ -10,6 +10,7 @@ test('payRefOf saca el código de pago de la descripción del banco', () => {
 })
 
 import { parseOrdersJson, ordersPath } from './pedidos.mjs'
+import { motivoDropi } from './errores.mjs'
 
 test('parseOrdersJson: estado, devolución, productos y sin datos del cliente', () => {
   const r = parseOrdersJson(JSON.stringify({ objects: [
@@ -35,4 +36,11 @@ test('ordersPath: todos los estados con el texto «null» (un status vacío lo r
   assert.equal(u.searchParams.get('user_id'), '77')
   assert.equal(u.searchParams.get('start'), '25')
   assert.equal(u.searchParams.get('from'), '2026-07-01')
+})
+
+test('motivoDropi: solo el mensaje de Dropi, recortado y sin tokens', () => {
+  assert.equal(motivoDropi('{"isSuccess":false,"message":"Parámetro inválido: status"}'), 'Parámetro inválido: status')
+  assert.equal(motivoDropi('{"error":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9abcdefghijklmnopqrstuv malo"}'), 'Bearer … malo')
+  assert.equal(motivoDropi('<html>502</html>'), '')
+  assert.equal(motivoDropi('{"message":"' + 'x '.repeat(100) + '"}').length <= 90, true)
 })

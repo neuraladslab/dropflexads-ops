@@ -3,7 +3,7 @@ import 'server-only'
 // Es la fuente de verdad del disponible: la app ya no lo calcula a partir de los movimientos. Una sola petición, con la sesión que la sincronización ya usó.
 import sql from '@/lib/db'
 import { CARD_ID_RE } from './config.mjs'
-import { DropiError, dropiRequest } from './client'
+import { DropiError, dropiRequest, inesperado } from './client'
 import { dec, getToken, recordReadFailure } from './session'
 
 /** Respuesta de Dropi → número, o null si no trae un saldo válido. */
@@ -24,7 +24,7 @@ export async function syncCardBalance(uid, { ip = '' } = {}) {
     const token = await getToken(uid, { ip })
     const r = await dropiRequest('GET', `/api/credit-cards/balances/${cardId}`, { token })
     if (r.status === 401) throw new DropiError('blocked', 'Dropi no aceptó la sesión para leer el saldo.')
-    if (r.status !== 200) throw new DropiError('unexpected', 'Dropi respondió algo inesperado al leer el saldo.', { status: r.status })
+    if (r.status !== 200) throw inesperado('el saldo de la tarjeta', r)
     const amount = parseBalance(r.text)
     if (amount == null) throw new DropiError('unexpected', 'Dropi no devolvió el saldo disponible.')
     const [row] = await sql`INSERT INTO dropi_balances (owner_id, account, amount) VALUES (${uid}, 'card', ${amount}) RETURNING read_at`

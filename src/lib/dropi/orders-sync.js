@@ -9,7 +9,7 @@ import { grupoEstado } from '@/domain/estadoPedido.ts'
 import { logActivity } from '@/lib/activity'
 import { hoyBogota, sumarDias } from '@/domain/fechas.ts'
 import { PAGE_DELAY_MS } from './config.mjs'
-import { DropiError, dropiRequest } from './client'
+import { DropiError, dropiRequest, inesperado } from './client'
 import { getToken, recordReadFailure } from './session'
 import { syncWalletRange } from './wallet-sync'
 
@@ -51,7 +51,7 @@ export async function syncOrders(uid, { ip = '', win: ventana = null } = {}) {
       const path = ordersPath({ userId, start, from: win.from, until: win.to, size: ORDERS_PAGE })
       const r = await dropiRequest('GET', path, { token })
       if (r.status === 401) throw new DropiError('blocked', 'Dropi no aceptó la sesión para leer los pedidos. Vuelve a sincronizar.')
-      if (r.status !== 200) throw new DropiError('unexpected', 'Dropi respondió algo inesperado al leer los pedidos.', { status: r.status })
+      if (r.status !== 200) throw inesperado('los pedidos', r)
       if (EMPTY.test(r.text)) break
       const p = parseOrdersJson(r.text)
       if (p.error) throw new DropiError('unexpected', 'No se pudo leer la lista de pedidos.')
@@ -77,7 +77,12 @@ export async function syncOrders(uid, { ip = '', win: ventana = null } = {}) {
     for (const x of rows) estados[x.status] = (estados[x.status] || 0) + 1
     return { ok: true, pages, read, inserted: imp.inserted, updated: imp.updated, window: win, backfill, estados }
   } catch (e) {
-    if (e instanceof DropiError) { await recordReadFailure(uid, e); return { ok: false, pages, read, inserted: 0, updated: 0, window: win, error: { code: e.code, message: e.message } } }
+    if (e instanceof DropiError) {
+      // Una respuesta «inesperada» a la consulta de pedidos es un problema de la consulta, no abuso: no se pone la conexión en pausa (bloquearía la tarjeta y la billetera).
+      if (e.code !== 'unexpected') await recordReadFailure(uid, e)
+      else console.error('[dropi] pedidos', e.status || '')
+      return { ok: false, pages, read, inserted: 0, updated: 0, window: win, error: { code: e.code, message: e.message } }
+    }
     console.error('[dropi] pedidos', e && (e.code || e.name))
     return { ok: false, pages, read, inserted: 0, updated: 0, window: win, error: { code: 'unexpected', message: 'No se pudieron traer los pedidos.' } }
   }

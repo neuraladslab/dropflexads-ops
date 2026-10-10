@@ -3,6 +3,7 @@ import 'server-only'
 // una petición a la vez. Nunca devuelve ni registra credenciales, tokens ni el texto de error de Dropi.
 import { MAX_RESPONSE_BYTES, REQUEST_TIMEOUT_MS, dropiBase } from './config.mjs'
 import { dropiHeaders } from './headers.mjs'
+import { motivoDropi } from './parse/errores.mjs'
 
 export class DropiError extends Error {
   // code: reauth | cooldown | blocked | network | unexpected | no_connection | busy
@@ -13,6 +14,15 @@ export class DropiError extends Error {
     this.seconds = seconds
     this.status = status
   }
+}
+
+/**
+ * Error «inesperado» con el PASO que falló, el código HTTP y el mensaje que dio Dropi (solo su campo `message`/`error`, recortado y sin cadenas largas
+ * que parezcan tokens). Así el panel dice qué pasó en vez de un genérico «algo inesperado».
+ */
+export function inesperado(paso, r) {
+  const m = motivoDropi(r.text)
+  return new DropiError('unexpected', `Dropi respondió algo inesperado al leer ${paso} (HTTP ${r.status}${m ? ': ' + m : ''}).`, { status: r.status })
 }
 
 const ALLOWED = [

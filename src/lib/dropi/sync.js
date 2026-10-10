@@ -13,7 +13,7 @@ import { getSetting } from '@/lib/settings'
 import { calcularVentana } from '@/domain/ventana.ts'
 import { diaBogota } from '@/domain/fechas.ts'
 import { CARD_ID_RE, OPERACION_INICIO, MAX_PAGES_PER_SYNC, MIN_SYNC_INTERVAL_S, PAGE_DELAY_MS, PAGE_SIZE, SYNC_BUDGET_MS, WINDOW_DAYS } from './config.mjs'
-import { DropiError, dropiRequest } from './client'
+import { DropiError, dropiRequest, inesperado } from './client'
 import { dec, getToken, invalidateToken, recordReadFailure } from './session'
 
 // Una lista vacía de verdad («data»: [] / «total_items»: 0) es una tarjeta sin movimientos, no un error.
@@ -99,7 +99,7 @@ export async function syncCardTransactions(uid, { budgetMs = SYNC_BUDGET_MS, ip 
       r = await dropiRequest('GET', path, { token })
     }
     if (r.status === 401) throw new DropiError('blocked', 'Dropi no aceptó la sesión nueva (¿la tarjeta o la cuenta no tienen permiso?).')
-    if (r.status !== 200) throw new DropiError('unexpected', 'Dropi respondió algo inesperado al leer los movimientos.', { status: r.status })
+    if (r.status !== 200) throw inesperado('los movimientos de la tarjeta', r)
     const parsed = parseCardJson(r.text)
     if (parsed.error) return EMPTY_LIST.test(r.text) ? EMPTY : null // sin lista de movimientos (o una lista vacía: tarjeta nueva sin movimientos)
     pages++

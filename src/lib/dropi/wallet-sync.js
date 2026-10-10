@@ -5,7 +5,7 @@ import sql from '@/lib/db'
 import { parseWalletJson } from './parse/billetera.mjs'
 import { logActivity } from '@/lib/activity'
 import { PAGE_DELAY_MS } from './config.mjs'
-import { DropiError, dropiRequest } from './client'
+import { DropiError, dropiRequest, inesperado } from './client'
 import { getToken, recordReadFailure } from './session'
 import { syncWindow } from './sync'
 
@@ -52,7 +52,7 @@ export async function syncWalletRange(uid, token, from, to) {
     await sleep(jitter())
     const r = await dropiRequest('GET', `/api/historywallet?orderBy=id&orderDirection=desc&result_number=${WALLET_PAGE}&start=${start}&textToSearch=&type=null&id=null&identification_code=null&user_id=${userId}&from=${from}&until=${to}&wallet_id=0`, { token })
     if (r.status === 401) throw new DropiError('blocked', 'Dropi no aceptó la sesión para leer la billetera. Vuelve a sincronizar.')
-    if (r.status !== 200) throw new DropiError('unexpected', 'Dropi respondió algo inesperado al leer la billetera.', { status: r.status })
+    if (r.status !== 200) throw inesperado('la billetera', r)
     if (EMPTY.test(r.text)) break
     const p = parseWalletJson(r.text)
     if (p.error) throw new DropiError('unexpected', 'No se pudo leer la lista de movimientos de la billetera.')
@@ -76,7 +76,7 @@ export async function syncWalletMovements(uid, { ip = '', win: ventana = null } 
       const path = `/api/historywallet?orderBy=id&orderDirection=desc&result_number=${WALLET_PAGE}&start=${start}&textToSearch=&type=null&id=null&identification_code=null&user_id=${userId}&from=${win.from}&until=${win.to}&wallet_id=0`
       const r = await dropiRequest('GET', path, { token })
       if (r.status === 401) throw new DropiError('blocked', 'Dropi no aceptó la sesión para leer la billetera. Vuelve a sincronizar.')
-      if (r.status !== 200) throw new DropiError('unexpected', 'Dropi respondió algo inesperado al leer la billetera.', { status: r.status })
+      if (r.status !== 200) throw inesperado('la billetera', r)
       if (EMPTY.test(r.text)) break
       const p = parseWalletJson(r.text)
       if (p.error) throw new DropiError('unexpected', 'No se pudo leer la lista de movimientos de la billetera.')

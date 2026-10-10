@@ -19,6 +19,9 @@ export async function sincronizarTodo(uid, { ip = '', otp = '', modo = 'incremen
   if (!card.ok) return card
   const balance = await syncCardBalance(uid, { ip }) // el saldo que informa Dropi: la fuente de verdad del disponible
   const wallet = await syncWalletMovements(uid, { ip, win: card.window })
-  const orders = await syncOrders(uid, { ip, ...(modo === 'rango' ? { win: card.window } : {}) }) // el estado real de cada pedido (entregado, devolución…)
+  // Si la billetera falló no se sigue pidiendo a Dropi: se informa y se omite lo que faltaba.
+  const orders = wallet.ok === false
+    ? { ok: false, omitido: true, error: { code: 'omitido', message: 'Se omitió porque falló la billetera.' } }
+    : await syncOrders(uid, { ip, ...(modo === 'rango' ? { win: card.window } : {}) }) // el estado real de cada pedido (entregado, devolución…)
   return { ...card, balance, wallet, orders }
 }
