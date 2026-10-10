@@ -204,3 +204,14 @@ CREATE TABLE IF NOT EXISTS dropi_orders (
 );
 CREATE INDEX IF NOT EXISTS idx_dropi_orders_owner_created ON dropi_orders (owner_id, created_date DESC);
 CREATE INDEX IF NOT EXISTS idx_dropi_orders_owner_group ON dropi_orders (owner_id, status_group);
+
+-- Herramientas de operación (costos mensuales fijos): se reparten por día en la contabilidad.
+CREATE TABLE IF NOT EXISTS fixed_costs (
+  id SERIAL PRIMARY KEY,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(80) NOT NULL,
+  monthly_amount NUMERIC(14,2) NOT NULL CHECK (monthly_amount >= 0),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_fixed_costs_owner ON fixed_costs (owner_id);

@@ -104,3 +104,17 @@ test("pedidos: pagado, sin pagar, no verificable, devuelto y en curso", () => {
   assert.deepEqual(r.map((p) => p.contable), ["pagado", "pagado", "sin_pagar", "no_verificable", "devuelto", "devuelto_cobrado", "en_curso"]);
   assert.equal(r[2].dias, 5);
 });
+
+import { diaVacio, resumirDias, netoDelDia } from "./porDia.ts";
+
+test("ganancia por día: suma de días y veredicto del período", () => {
+  const d1 = { ...diaVacio("2026-09-25"), ganancia: 300000, meta: 200000, devoluciones: 20000 };
+  const d2 = { ...diaVacio("2026-09-26"), ganancia: 100000, meta: 250000, otrosGastos: 10000 };
+  assert.equal(netoDelDia(d1).neto, 80000);
+  assert.equal(netoDelDia(d2).veredicto, "pierde");
+  const r = resumirDias([d1, d2], 1000);
+  assert.equal(r.total.ganancia, 400000);
+  assert.equal(r.herramientas, 2000);
+  assert.equal(r.neto, 400000 - (450000 + 20000 + 10000 + 2000)); // -82000
+  assert.equal(r.veredicto, "pierde");
+});

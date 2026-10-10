@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { Icono } from '@/components/shell/Icono'
 
 // Mismo diseño que el panel de Dropi de la app original: tarjeta horizontal a todo el ancho (estado a la izquierda, botones a la derecha),
@@ -170,6 +171,7 @@ function Resultado({ r }) {
 }
 
 export default function ConexionDropi() {
+  const router = useRouter()
   const [d, setD] = useState(null)
   const [errorCarga, setErrorCarga] = useState('')
   const [min, setMin] = useState(true)
@@ -191,7 +193,7 @@ export default function ConexionDropi() {
     setTrabajando(textoEspera); setResultado(null)
     try { setResultado(await llamar('POST', { action: nombre, ...(otp ? { otp } : {}) })) }
     catch (e) { setResultado({ error: { message: e.message } }) }
-    finally { setOtp(''); setTrabajando(''); cargar() }
+    finally { setOtp(''); setTrabajando(''); cargar(); router.refresh() } // las listas de abajo se leen en el servidor
   }
 
   const caja = (hijos, mini) => (
@@ -247,8 +249,8 @@ export default function ConexionDropi() {
     <>
       {panel}
       <Resultado r={resultado} />
-      {dialogo === 'conectar' && <DialogoConectar onCerrar={() => setDialogo(null)} onListo={() => { setDialogo(null); cargar() }} />}
-      {dialogo === 'desconectar' && <DialogoDesconectar onCerrar={() => setDialogo(null)} onListo={() => { setDialogo(null); setResultado(null); cargar() }} />}
+      {dialogo === 'conectar' && <DialogoConectar onCerrar={() => setDialogo(null)} onListo={() => { setDialogo(null); cargar(); router.refresh() }} />}
+      {dialogo === 'desconectar' && <DialogoDesconectar onCerrar={() => setDialogo(null)} onListo={() => { setDialogo(null); setResultado(null); cargar(); router.refresh() }} />}
     </>
   )
 }
