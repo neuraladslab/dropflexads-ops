@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Pendiente } from '@/components/shell/Pagina'
-import { VistaPedidos } from '@/components/datos/Vistas'
+import { VistaPedidos, VistaGastoCampana, VistaEscalar, VistaInformeDiario } from '@/components/datos/Vistas'
+import PanelMeta from '@/components/PanelMeta'
 import ResultadoCampana from '@/components/ResultadoCampana'
 import TarjetaCombos from '@/components/datos/TarjetaCombos'
 import { datosCampana } from '@/lib/datos'
@@ -9,8 +10,8 @@ import { usuarioActual } from '@/lib/sesion'
 
 export const metadata = { title: 'Campaña · DropFlexAds Ops' }
 
-// Cada campaña tiene sus propias secciones (como en el diagrama): Pedidos, Creativos y Cuándo escalar.
-const TABS = [{ slug: '', titulo: 'Pedidos' }, { slug: 'creativos', titulo: 'Creativos' }, { slug: 'escalar', titulo: 'Cuándo escalar' }]
+// Cada campaña tiene sus propias secciones (como en el diagrama): Pedidos, Gasto en Meta, Creativos y Cuándo escalar.
+const TABS = [{ slug: '', titulo: 'Pedidos' }, { slug: 'informe', titulo: 'Pedidos por día' }, { slug: 'meta', titulo: 'Gasto en Meta' }, { slug: 'creativos', titulo: 'Creativos' }, { slug: 'escalar', titulo: 'Cuándo escalar' }]
 
 export default async function PaginaCampana({ params }) {
   const { id, tab } = await params
@@ -32,16 +33,19 @@ export default async function PaginaCampana({ params }) {
           {c.clave === 'todos' && <p className="muted" style={{ marginTop: 6 }}>Todos tus pedidos, de todas las campañas y los que no tienen campaña.</p>}
         </div>
       </div>
-      {c.r && <div className="card" style={{ marginBottom: 16 }}><ResultadoCampana r={c.r} /></div>}
+      {(c.r || c.gasto) && <div className="card" style={{ marginBottom: 16 }}><ResultadoCampana r={c.r} gasto={c.gasto} /></div>}
       <TarjetaCombos c={c.combos} />
       {c.conTabs && (
         <div className="seg" role="tablist" style={{ marginBottom: 20, flexWrap: 'wrap' }}>
           {TABS.map((t) => <Link key={t.slug} role="tab" aria-selected={t.slug === slug} href={t.slug ? `${base}/${t.slug}` : base} className={'segl' + (t.slug === slug ? ' on' : '')}>{t.titulo}</Link>)}
         </div>
       )}
+      {slug === '' && c.clave === 'todos' && <><VistaInformeDiario filas={c.informe} /><div style={{ height: 20 }} /></>}
       {slug === '' && <VistaPedidos d={c.pedidos} ocultarCampana={c.conTabs || c.clave === 'sin'} sinKpis={!!c.r} vacio={vacio} />}
+      {slug === 'informe' && <VistaInformeDiario filas={c.informe} nombre={c.nombre} />}
+      {slug === 'meta' && <><PanelMeta /><VistaGastoCampana m={c.meta} inicio={c.inicio} /></>}
       {slug === 'creativos' && <Pendiente titulo={`Creativos de «${c.nombre}»`} queMuestra="Los anuncios de esta campaña con su nombre estándar, el enlace al archivo y su resultado (alcance, CPA y gasto de cada uno)." fuente="Meta Ads: cada anuncio se une a su campaña." fase="Después de conectar Meta" />}
-      {slug === 'escalar' && <Pendiente titulo={`Cuándo escalar «${c.nombre}»`} queMuestra="Si conviene subir el presupuesto de esta campaña y cuánto, según su ROAS de margen, su CPA y los días con datos. Usa las reglas de la calculadora de escalado." fuente="Gasto de Meta de esta campaña y su ganancia real de Dropi." fase="Necesita Meta Ads" />}
+      {slug === 'escalar' && <VistaEscalar e={c.escalar} nombre={c.nombre} vinculada={c.meta.vinculada} />}
     </>
   )
 }

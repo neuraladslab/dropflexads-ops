@@ -42,7 +42,7 @@ export async function metaGet(token, version, ruta, params = {}, intento = 0) {
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 25_000)
   let res, body
   try {
-    res = await fetch(base() + path + '?' + new URLSearchParams(params), { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store', redirect: 'manual', signal: ctl.signal })
+    res = await fetch(base() + path + '?' + new URLSearchParams(params), { method: 'GET', headers: { Authorization: 'Bearer ' + token }, cache: 'no-store', redirect: 'manual', signal: ctl.signal })
     body = await res.json().catch(() => ({}))
   } catch { throw new MetaError('red', MSG.red) } finally { clearTimeout(timer) }
   await respetarCuota(res)

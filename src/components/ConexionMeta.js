@@ -42,13 +42,13 @@ function DialogoConectar({ onCerrar, onListo, actual }) {
     <Dialogo etiqueta="Conectar Meta" onCerrar={onCerrar}>
       <form onSubmit={enviar}>
         <h2 style={{ fontSize: 26 }}>Conectar Meta Ads</h2>
-        <p className="muted" style={{ marginTop: 10 }}>Se usa la <b>API oficial de Meta</b>, solo para <b>leer</b>: gasto de tus campañas y cobros. No se crea, edita ni pausa nada, y no hay automatización del navegador, así que no pone en riesgo tu cuenta. El token se guarda <b>cifrado</b> y no vuelve al navegador.</p>
+        <p className="muted" style={{ marginTop: 10 }}>Se usa la <b>API oficial de Meta</b>, solo para <b>leer</b>: gasto, CPM y CTR de tus campañas. No se crea, edita ni pausa nada, y no hay automatización del navegador, así que no pone en riesgo tu cuenta. El token se guarda <b>cifrado</b> y no vuelve al navegador.</p>
         <details className="md-flat" style={{ marginTop: 12 }}>
           <summary>¿Cómo consigo el token? <span className="md-sm">4 pasos en Business Manager</span></summary>
           <ol style={{ margin: '10px 0 0', paddingLeft: 20, fontSize: 14, lineHeight: 1.7 }}>
             <li>Entra a <b>business.facebook.com/settings</b> → <b>Usuarios → Usuarios del sistema → Agregar</b>. Rol «Empleado» basta.</li>
             <li><b>Agregar activos</b> → Cuentas publicitarias → elige tu cuenta con permiso solo de <b>ver rendimiento</b>.</li>
-            <li><b>Generar token</b>: elige tu app y marca solo <b>ads_read</b> (y <b>business_management</b> si quieres ver cobros).</li>
+            <li><b>Generar token</b>: elige tu app y marca solo <b>ads_read</b>.</li>
             <li>Copia el token (se muestra una sola vez) y pégalo aquí. El ID de la cuenta lo ves en el Administrador de anuncios.</li>
           </ol>
         </details>
@@ -84,7 +84,7 @@ function DialogoDesconectar({ onCerrar, onListo }) {
     <Dialogo etiqueta="Desconectar Meta" onCerrar={onCerrar}>
       <form onSubmit={enviar}>
         <h2 style={{ fontSize: 24 }}>¿Desconectar Meta?</h2>
-        <p className="muted" style={{ marginTop: 12 }}>Se borra de aquí el token. El gasto y los cobros que ya trajiste se quedan.</p>
+        <p className="muted" style={{ marginTop: 12 }}>Se borra de aquí el token. El gasto que ya trajiste y los cobros que anotaste se quedan.</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 18 }}>
           <Campo id="md-app" etiqueta="Tu contraseña de esta app (para confirmar que eres tú)" type="password" autoComplete="current-password" maxLength={128} value={c.appPassword} onChange={(e) => setC((p) => ({ ...p, appPassword: e.target.value }))} />
           <Campo id="md-code" etiqueta="Código de tu app autenticadora (solo si activaste la verificación en dos pasos aquí)" inputMode="numeric" autoComplete="one-time-code" maxLength={20} placeholder="123456" value={c.appCode} onChange={(e) => setC((p) => ({ ...p, appCode: e.target.value }))} />
@@ -132,7 +132,7 @@ export default function ConexionMeta() {
         <div className="card" style={{ display: 'flex', gap: '14px 24px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ maxWidth: 640 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><b style={{ fontSize: 18 }}>Cuenta de Meta</b><Chip tono="idle">Sin conectar</Chip></div>
-            <div className="muted" style={{ fontSize: 14, marginTop: 4 }}>Conecta tu cuenta publicitaria por la API oficial de Meta (solo lectura) para traer el gasto de cada campaña y tus cobros. Con eso se separa la publicidad de «otros gastos» y se puede calcular el costo por venta y cuándo escalar.</div>
+            <div className="muted" style={{ fontSize: 14, marginTop: 4 }}>Conecta tu cuenta publicitaria por la API oficial de Meta (solo lectura) para traer el gasto, CPM y CTR de cada campaña. Se sincroniza desde Campañas. Los cobros (con su referencia de pago) los anotas o importas en Mis cuentas → Meta Ads. Con eso se separa la publicidad de «otros gastos» y se puede calcular el costo por venta y cuándo escalar.</div>
           </div>
           <button className="btn" onClick={() => setDialogo('conectar')}><Icono n="plus" size={16} />Conectar Meta</button>
         </div>
@@ -149,7 +149,7 @@ export default function ConexionMeta() {
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><b style={{ fontSize: 18 }}>{d.accountName || 'Cuenta de Meta'}</b>{estado}</div>
             <div className="muted" style={{ fontSize: 13.5, marginTop: 4 }}>{d.adAccountId} · moneda {d.currency || '—'} · token {d.tokenHint} · última sincronización {hace(d.lastSyncOkAt)}</div>
             {d.lastError && <div style={{ fontSize: 13.5, color: 'var(--coral-ink)', marginTop: 4, maxWidth: 640 }}>{d.lastError}</div>}
-            <p className="muted only-learner" style={{ fontSize: 13.5, margin: '8px 0 0' }}>El gasto y los cobros se traen desde <b>Mis cuentas → Meta Ads</b> y una vez al día solos.</p>
+            <p className="muted only-learner" style={{ fontSize: 13.5, margin: '8px 0 0' }}>El gasto se trae con «Sincronizar» en <b>Campañas</b> y una vez al día solo.</p>
           </div>
           <div className="rowbtns">
             {d.state !== 'ok' && <button className="btn sm" onClick={() => setDialogo('conectar')}>Reconectar</button>}

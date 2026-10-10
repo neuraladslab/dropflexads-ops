@@ -681,3 +681,28 @@ a.ni{text-decoration:none}
 .wlt-pocket{position:absolute;left:0;right:0;bottom:0;height:54px;background:rgba(5,10,30,.42);border-top:1px solid rgba(255,255,255,.14);z-index:1;display:flex;align-items:center;gap:20px;padding:0 24px;font-size:13.5px}
 .wlt-pocket span b{font-family:var(--mono)}
 .wlt-clasp{margin-left:auto;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.55)}
+
+/* ---------- Ayudas («?») y gráficas por día ---------- */
+.ayuda{position:relative;display:inline-flex;vertical-align:middle;margin-left:6px}
+.ayuda-btn{width:20px;height:20px;border-radius:50%;border:1px solid var(--line2);background:var(--panel);color:#64748B;font:700 12px var(--sans);display:grid;place-items:center;cursor:pointer;padding:0;line-height:1}
+.ayuda-btn:hover,.ayuda-btn[aria-expanded="true"]{background:var(--blue-soft);color:var(--blue);border-color:var(--blue-line)}
+.ayuda-pop{position:absolute;z-index:40;top:26px;left:-8px;width:min(320px,80vw);display:flex;flex-direction:column;gap:6px;background:#0F172A;color:#fff;border-radius:14px;padding:14px 16px;font:500 13.5px/1.45 var(--sans);box-shadow:0 12px 32px rgba(15,23,42,.28);text-align:left;font-weight:500}
+.ayuda-pop b{font-weight:700}
+.ayuda-pop .ayuda-f{opacity:.8;font-size:12.5px}
+.ayuda-pop .link{color:#93C5FD;font-weight:600}
+.gr-head{display:flex;justify-content:space-between;gap:8px 18px;flex-wrap:wrap;align-items:baseline}
+.gr-title{font-size:19px;font-weight:800;letter-spacing:-.01em}
+.gr-sub{font-size:13.5px;color:var(--muted)}
+.gr-bar{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center;margin:12px 0 4px}
+.gr-bar .seg button{padding:5px 12px;font-size:13px}
+.gr-wrap{position:relative;display:flex;margin-top:6px}
+.gr-scroll{flex:1;min-width:0;overflow-x:auto;overflow-y:hidden}
+.gr-tip{position:absolute;z-index:30;pointer-events:none;background:#0F172A;color:#fff;border-radius:12px;padding:11px 14px;font:500 13px/1.45 var(--sans);box-shadow:0 12px 30px rgba(15,23,42,.3);min-width:150px;max-width:260px}
+.gr-tip b{display:block;font-size:13.5px;margin-bottom:3px}
+.gr-tip i{font-style:normal;opacity:.78}
+.gr-note{font-size:13px;color:var(--muted);margin:8px 0 0}
+.gr-mini{display:grid;grid-template-columns:minmax(230px,1fr) 2fr;gap:0}
+.gr-mini>div{padding:2px 24px}
+.gr-mini>div:first-child{border-right:1px solid var(--line);padding-left:0}
+@media (max-width:760px){.gr-mini{grid-template-columns:1fr}.gr-mini>div:first-child{border-right:0;border-bottom:1px solid var(--line);padding:0 0 16px}.gr-mini>div{padding:16px 0 0}}
+.aprender-t{scroll-margin-top:90px}

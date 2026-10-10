@@ -74,7 +74,7 @@ function Tarjeta({ c, productos, onCambio }) {
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{c.productos.map((p) => <span key={p.id} className="chip idle">{p.nombre}</span>)}</div>
       {editando
         ? <div style={{ marginTop: 14 }}><FormularioCampana productos={productos} inicial={{ nombre: c.nombre, productIds: c.productIds }} etiqueta="Guardar cambios" onCancelar={() => setEditando(false)} onGuardar={async (v) => { await onCambio(c.id, v); setEditando(false) }} /></div>
-        : <ResultadoCampana r={c.r} />}
+        : <ResultadoCampana r={c.r} gasto={c.gasto} />}
     </div>
   )
 }

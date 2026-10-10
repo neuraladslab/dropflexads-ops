@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Icono } from '@/components/shell/Icono'
 import { diaCorto, hace } from '@/lib/formato'
 
-// Mis cuentas → Meta Ads: estado de la conexión y UN solo control, «Sincronizar» (desde la fecha de inicio de tu operación, la misma de Dropi).
+// Campañas (lista y pestaña «Gasto en Meta»): estado de la conexión y UN solo control, «Sincronizar» (desde la fecha de inicio de tu operación, la misma de Dropi).
 async function llamar(method, body) {
   const res = await fetch('/api/meta', { method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
   const data = await res.json().catch(() => ({}))
@@ -34,7 +34,7 @@ export default function PanelMeta() {
   if (error) return caja(<><div><b>Meta Ads</b><div className="muted" style={{ fontSize: 14 }}>{error}</div></div><button className="btn ghost sm" onClick={cargar}>Reintentar</button></>)
   if (!d) return caja(<div className="muted">Meta Ads: cargando…</div>)
   if (!d.connected) return caja(<>
-    <div style={{ maxWidth: 620 }}><b>Conexión con Meta Ads</b><div className="muted" style={{ fontSize: 14, marginTop: 2 }}>Trae el gasto de cada campaña y tus cobros por la API oficial de Meta (solo lectura). Se conecta una vez en Configuración.</div></div>
+    <div style={{ maxWidth: 620 }}><b>Conexión con Meta Ads</b><div className="muted" style={{ fontSize: 14, marginTop: 2 }}>Trae el gasto, CPM y CTR de cada campaña por la API oficial de Meta (solo lectura). Se conecta una vez en Configuración.</div></div>
     <Link href="/configuracion" className="btn sm"><Icono n="plus" size={15} />Conectar Meta</Link>
   </>)
   const ok = d.state === 'ok'
@@ -52,10 +52,7 @@ export default function PanelMeta() {
         </div>
       </>)}
       {res && (res.ok
-        ? <div className={'tint ' + (res.cobros && res.cobros.ok === false ? 'warn' : 'ok')} style={{ marginBottom: 16 }}>
-            <b style={{ color: res.cobros && res.cobros.ok === false ? 'var(--gold-ink)' : 'var(--jade-ink)' }}>Listo: {res.gasto.filas} filas de gasto (${res.gasto.total.toLocaleString('es-CO')} sin IVA) y {res.cobros.nuevos} cobros nuevos.</b>
-            {res.cobros && res.cobros.ok === false && <div style={{ fontSize: 14, marginTop: 4 }}>El gasto se guardó, pero los cobros no se pudieron leer: {res.cobros.error}</div>}
-          </div>
+        ? <div className="tint ok" style={{ marginBottom: 16 }}><b style={{ color: 'var(--jade-ink)' }}>Listo: {res.gasto.filas} filas de gasto (${res.gasto.total.toLocaleString('es-CO')} sin IVA).</b></div>
         : <div className="tint bad" role="alert" style={{ marginBottom: 16 }}><b style={{ color: 'var(--coral-ink)' }}>{(res.error && res.error.message) || 'No se pudo sincronizar con Meta.'}</b></div>)}
     </>
   )

@@ -69,9 +69,9 @@ export async function syncOrders(uid, { ip = '', win: ventana = null } = {}) {
       if (p.total < ORDERS_PAGE) break
     }
     const imp = await importOrderRows(uid, rows)
-    // Si un pedido que ya teníamos se canceló después, o es anterior al inicio de la operación, se quita.
-    const guardados = await sql`SELECT order_id, status, created_date::text AS creado FROM dropi_orders WHERE owner_id = ${uid}`
-    const quitar = [...new Set([...omitidas, ...guardados.filter((g) => !seImporta(g.status) || !dentroDeOperacion(g.creado, inicio)).map((g) => g.order_id)])]
+    // Si un pedido que ya teníamos se canceló después, se quita. Los anteriores a la fecha de sincronización NO se tocan: las pantallas ya filtran por el inicio de la operación.
+    const guardados = await sql`SELECT order_id, status FROM dropi_orders WHERE owner_id = ${uid}`
+    const quitar = [...new Set([...canceladas, ...guardados.filter((g) => !seImporta(g.status)).map((g) => g.order_id)])]
     if (quitar.length) await sql`DELETE FROM dropi_orders WHERE owner_id = ${uid} AND order_id = ANY(${quitar})`
     // Si hay pedidos entregados ANTES de lo que cubre la billetera sincronizada, se lee la billetera de ese rango: así se sabe si los pagaron (y no se queda en «no verificable»).
     let backfill = null

@@ -331,3 +331,68 @@ test("cruce: la referencia de pago manda; el respaldo solo toca cobros sin refer
   assert.deepEqual(r.porMonto, []);
   assert.deepEqual(r.cobrosSinTarjeta.map((c) => c.id), ["2"]);
 });
+
+import { acumuladoPorDia, serieMeta, resumenMeta } from "./series.ts";
+
+test("acumulado por día: el último valor es recuperado − invertido, con herramientas por día calendario", () => {
+  const a = { ...diaVacio("2026-09-21"), ganancia: 100000, meta: 40000 };
+  const b = { ...diaVacio("2026-09-23"), ganancia: 20000, meta: 70000, devoluciones: 5000 };
+  const s = acumuladoPorDia([a, b], 1000, "2026-09-21", "2026-09-23"); // el 22 no tiene movimientos
+  assert.deepEqual(s.map((x) => x.dia), ["2026-09-21", "2026-09-22", "2026-09-23"]);
+  assert.equal(s[0].neto, 59000); assert.equal(s[1].neto, -1000); assert.equal(s[2].neto, -56000);
+  const recuperado = 120000, invertido = 40000 + 70000 + 5000 + 3 * 1000;
+  assert.equal(s[2].acumulado, recuperado - invertido);
+  assert.equal(s[0].entro, 100000); assert.equal(s[0].gasto, 41000);
+});
+test("serie y resumen de Meta: CPM = gasto/impresiones×1000 y CTR = clics/impresiones", () => {
+  const filas = [{ d: "2026-10-01", spend: 27254, imp: 3500, clicks: 70 }, { d: "2026-10-03", spend: 20000, imp: 10000, clicks: 500 }];
+  const s = serieMeta(filas, "2026-10-01", "2026-10-03");
+  assert.equal(s[0].cpm, 7786.86); assert.equal(s[0].ctr, 2); assert.equal(s[1].gasto, 0); assert.equal(s[1].cpm, null); assert.equal(s[2].ctr, 5);
+  const r = resumenMeta(filas);
+  assert.equal(r.gasto, 47254); assert.equal(r.dias, 2); assert.equal(r.promedioDia, 23627);
+  assert.equal(r.cpm, 3500.3); assert.equal(r.ctr, 4.22); assert.equal(r.mejorCpm?.dia, "2026-10-03"); assert.equal(r.peorCpm?.dia, "2026-10-01"); assert.equal(r.mejorCtr?.dia, "2026-10-03");
+});
+
+import { gananciaPorVenta, costoPorVentaReal } from "./porVenta.ts";
+test("por día de venta: la ganancia va al día en que se vendió, no al día que Dropi pagó", () => {
+  const pedidos = [
+    { creado: "2026-09-28", contable: "pagado", ganancia: 60000 }, { creado: "2026-09-28", contable: "en_curso", ganancia: 0 },
+    { creado: "2026-09-29", contable: "sin_pagar", ganancia: 0 }, { creado: "2026-09-29", contable: "devuelto", ganancia: 0 },
+  ];
+  const s = gananciaPorVenta(pedidos, [{ dia: "2026-09-28", publicidad: 51000, otros: 1000 }], "2026-09-28", "2026-09-29");
+  assert.equal(s[0].ventas, 2); assert.equal(s[0].entro, 60000); assert.equal(s[0].enCamino, 1); assert.equal(s[0].neto, 8000);
+  assert.equal(s[1].ventas, 2); assert.equal(s[1].entregados, 1); assert.equal(s[1].devueltos, 1); assert.equal(s[1].entro, 0); assert.equal(s[1].neto, 0);
+  const c = costoPorVentaReal(s);
+  assert.equal(c.ventas, 4); assert.equal(c.entregados, 2); assert.equal(c.costoPorPedido, 12750); assert.equal(c.cpaEntrega, 25500);
+  assert.equal(c.gananciaPorPedido, 60000); assert.equal(c.quedaPorEntrega, 34500); assert.equal(c.mejorCaso, 17000); // 51.000 ÷ (2 entregados + 1 en camino)
+});
+
+import { proyectarRecuperacion } from "./proyeccion.ts";
+test("proyección: lo pendiente paga el promedio real en la fecha habitual y se cruza el cero cuando cubre lo que falta", () => {
+  const p = proyectarRecuperacion({ faltan: 100000, gananciaPorPedido: 50000, lagDias: 7, hoy: "2026-10-10", tasas: [0.5, 1],
+    pendientes: [{ creado: "2026-10-01", contable: "sin_pagar" }, { creado: "2026-10-05", contable: "en_curso" }, { creado: "2026-10-09", contable: "en_curso" }, { creado: "2026-10-09", contable: "devuelto" }] });
+  assert.ok(p);
+  assert.equal(p.pendientes, 3); assert.equal(p.seguras, 1);
+  // sin_pagar: hoy (el 8 ya pasó) → 50.000; en camino del 5 → 12/oct; del 9 → 16/oct
+  const [medio, pleno] = p.escenarios;
+  assert.equal(medio.esperado, 50000 + 25000 + 25000); assert.equal(medio.cubre, true); assert.equal(medio.fecha, "2026-10-16");
+  assert.equal(pleno.esperado, 150000); assert.equal(pleno.sobra, 50000); assert.equal(pleno.fecha, "2026-10-12");
+  assert.equal(p.serie[0].acumulado, -50000); // arranca con lo que falta menos lo ya seguro de hoy
+  assert.equal(proyectarRecuperacion({ faltan: 1, gananciaPorPedido: null, lagDias: 7, pendientes: [], hoy: "2026-10-10" }), null);
+});
+
+import { evaluarEscalado, diasDesdeCambio, incrementoPara } from "./escalar.ts";
+test("escalado: reglas de la calculadora con entrega prudente", () => {
+  const dias = (g: number, v: number) => Array.from({ length: 7 }, (_, k) => ({ dia: `2026-10-0${k + 1}`, gasto: g, ventas: v }));
+  const bien = evaluarEscalado({ dias: dias(50000, 5), margen: 50000 }); // ROAS = 35×50000/(350000×1,19) ≈ 4,2 → prudente 2,52
+  assert.equal(bien.veredicto, "escalar"); assert.equal(bien.incremento, 50); assert.equal(bien.nuevoPresupuesto, 75000);
+  assert.equal(evaluarEscalado({ dias: dias(50000, 3), margen: 50000 }).veredicto, "vigilar"); // 1,8 ventas/día prudentes y ROAS 1,51
+  assert.equal(evaluarEscalado({ dias: dias(50000, 1), margen: 50000 }).veredicto, "pausar"); // ROAS prudente 0,50
+  assert.equal(evaluarEscalado({ dias: dias(50000, 5), margen: null }).veredicto, "sin_datos");
+  assert.equal(evaluarEscalado({ dias: dias(50000, 5).slice(0, 2), margen: 50000 }).veredicto, "vigilar"); // menos de 3 días
+  assert.equal(incrementoPara(1.99), 0); assert.equal(incrementoPara(2), 25); assert.equal(incrementoPara(4), 100);
+  assert.equal(diasDesdeCambio([30000, 30000, 30000, 30000, 60000, 60000]), 2); // saltó hace 2 días
+  assert.equal(diasDesdeCambio([30000, 31000, 29000, 30500]), null);
+  const reciente = evaluarEscalado({ dias: [...dias(30000, 5).slice(0, 5), { dia: "2026-10-06", gasto: 60000, ventas: 9 }, { dia: "2026-10-07", gasto: 60000, ventas: 9 }], margen: 50000 });
+  assert.equal(reciente.veredicto, "vigilar"); assert.equal(reciente.checks?.find((c) => c.clave === "espera")?.ok, false);
+});

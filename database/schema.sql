@@ -274,3 +274,6 @@ CREATE INDEX IF NOT EXISTS idx_meta_spend_owner_day ON meta_spend_daily (owner_i
 
 -- Los cobros de Meta (con IVA incluido) pueden venir de la API o de otro origen; la referencia de pago es opcional (si no llega, el cruce con la tarjeta usa monto y fecha).
 ALTER TABLE meta_charges ADD COLUMN IF NOT EXISTS source VARCHAR(10) NOT NULL DEFAULT 'manual';
+
+-- Identificador de la transacción tal como sale en el extracto de Meta (p. ej. 28990819463938228-28947602274926610); es opcional y evita duplicar al importar.
+ALTER TABLE meta_charges ADD COLUMN IF NOT EXISTS reference VARCHAR(80);

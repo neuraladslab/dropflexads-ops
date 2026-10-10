@@ -1,6 +1,5 @@
 import { crearPagina } from '@/components/shell/crearPagina'
 import ConexionDropi from '@/components/ConexionDropi'
-import PanelMeta from '@/components/PanelMeta'
 import { VistaBilletera, VistaTarjeta, VistaMeta } from '@/components/datos/Vistas'
 import { datosBilletera, datosTarjeta, datosMeta } from '@/lib/datos'
 import { usuarioActual } from '@/lib/sesion'
@@ -11,5 +10,5 @@ export const metadata = { title: 'Mis cuentas · DropFlexAds Ops' }
 export default crearPagina('/cuentas', {
   '': async () => (<><ConexionDropi /><VistaBilletera d={await datosBilletera(await usuarioActual())} /></>),
   'dropi-tarjeta': async () => (<><ConexionDropi /><VistaTarjeta d={await datosTarjeta(await usuarioActual())} /></>),
-  'meta-ads': async () => (<><PanelMeta /><VistaMeta d={await datosMeta(await usuarioActual())} /></>),
+  'meta-ads': async () => <VistaMeta d={await datosMeta(await usuarioActual())} />,
 })

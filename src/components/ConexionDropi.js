@@ -140,7 +140,7 @@ export default function ConexionDropi() {
   }, [])
   useEffect(() => { cargar() }, [cargar])
 
-  // «Sincronizar desde»: guarda la fecha (si cambió) y trae tarjeta, billetera y pedidos desde ahí. No borra nada y no duplica lo que ya está.
+  // «Sincronizar desde»: trae tarjeta, billetera y pedidos desde esa fecha. Una fecha anterior al inicio amplía la operación; una posterior solo limita lo que se lee. Nunca borra días anteriores ni duplica lo que ya está.
   async function sincronizar(e) {
     e.preventDefault()
     const fecha = desde || d.opFrom
@@ -148,8 +148,10 @@ export default function ConexionDropi() {
     setResultado(null)
     setTrabajando(`Sincronizando desde el ${diaCorto(fecha)}… (se hace despacio, a propósito)`)
     try {
-      if (fecha !== d.opFrom) await llamar('POST', { action: 'set_start', from: fecha })
-      setResultado(await llamar('POST', { action: 'sync', historico: true, ...(otp ? { otp } : {}) }))
+      // Una fecha ANTERIOR al inicio amplía la operación hacia atrás. Una fecha POSTERIOR solo limita lo que se vuelve a leer: el inicio y los días anteriores se conservan.
+      if (fecha < d.opFrom) await llamar('POST', { action: 'set_start', from: fecha })
+      const soloDesde = fecha > d.opFrom
+      setResultado(await llamar('POST', { action: 'sync', ...(soloDesde ? { from: fecha, to: hoyISO() } : { historico: true }), ...(otp ? { otp } : {}) }))
     } catch (ex) { setResultado({ error: { message: ex.message } }) }
     finally { setOtp(''); setDesde(''); setTrabajando(''); cargar(); router.refresh() } // las listas de abajo se leen en el servidor
   }

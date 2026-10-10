@@ -33,7 +33,8 @@ test('estado y referencia', () => {
   assert.equal(referenciaDe({ id: '28867994719554031-28863059346714241', tracking_id: 'abc' }), '')
 })
 test('rutas de Meta: solo lectura de la cuenta; el ID de cuenta se normaliza', () => {
-  for (const p of ['/v23.0/act_941640195133155', '/v23.0/act_941640195133155/insights', '/v23.0/act_941640195133155/transactions']) assert.equal(rutaMetaPermitida(p), true, p)
+  for (const p of ['/v23.0/act_941640195133155', '/v23.0/act_941640195133155/insights']) assert.equal(rutaMetaPermitida(p), true, p)
+  assert.equal(rutaMetaPermitida('/v23.0/act_941640195133155/transactions'), false) // los cobros ya no se piden a Meta
   for (const p of ['/v23.0/me/adaccounts', '/v23.0/act_941640195133155/campaigns', '/v23.0/act_941640195133155/adsets', '/act_1/insights', '/v23.0/act_941640195133155/insights/extra']) assert.equal(rutaMetaPermitida(p), false, p)
   assert.equal(cuentaMeta('941640195133155'), 'act_941640195133155'); assert.equal(cuentaMeta(' act_941640195133155 '), 'act_941640195133155'); assert.equal(cuentaMeta('abc'), null)
 })

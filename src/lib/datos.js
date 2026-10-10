@@ -9,6 +9,10 @@ import { recuperacion } from '@/domain/recuperacion.ts'
 import { atribuir, resumenPorCampana } from '@/domain/campanas.ts'
 import { seImporta } from '@/domain/estadoPedido.ts'
 import { dentroDeOperacion } from '@/domain/ventana.ts'
+import { acumuladoPorDia, serieMeta, resumenMeta } from '@/domain/series.ts'
+import { gananciaPorVenta, costoPorVentaReal } from '@/domain/porVenta.ts'
+import { proyectarRecuperacion } from '@/domain/proyeccion.ts'
+import { evaluarEscalado } from '@/domain/escalar.ts'
 import { combosVendidos } from '@/domain/combos.ts'
 import { flujoPorDia } from '@/domain/billetera.ts'
 import { OPERACION_INICIO } from '@/lib/dropi/config.mjs'
@@ -107,10 +111,13 @@ export async function datosPedidos(uid) {
 /** Ganancia por día (Bogotá): billetera + tarjeta cruzada con Meta. */
 export async function datosGananciaPorDia(uid) {
   const inicio = await inicioDe(uid)
-  const [wal, tarjeta, herr] = await Promise.all([
+  const [wal, tarjeta, herr, camp, ped, gastoMeta, [conMeta]] = await Promise.all([
     sql`SELECT tx_date::text AS d, kind, SUM(amount)::float8 AS sum, COUNT(*)::int AS n FROM wallet_movements w WHERE owner_id = ${uid} AND tx_date >= ${inicio} AND kind IN ('profit', 'return_fee', 'card_fee', 'recharge_fee', 'other_out', 'transfer_out') AND NOT EXISTS (SELECT 1 FROM wallet_movements r WHERE r.owner_id = w.owner_id AND r.reverses = w.external_id) GROUP BY tx_date, kind`,
     datosTarjeta(uid),
     sql`SELECT COALESCE(SUM(monthly_amount), 0)::float8 AS m FROM fixed_costs WHERE owner_id = ${uid} AND active`.catch(() => [{ m: 0 }]),
+    datosCampanas(uid), datosPedidos(uid),
+    sql`SELECT day::text AS d, SUM(spend)::float8 AS spend FROM meta_spend_daily WHERE owner_id = ${uid} AND day >= ${inicio} GROUP BY day`,
+    sql`SELECT vat_pct::float8 AS vat FROM meta_connections WHERE owner_id = ${uid}`,
   ])
   const dias = new Map()
   const dia = (d) => { if (!dias.has(d)) dias.set(d, diaVacio(d)); return dias.get(d) }
@@ -128,7 +135,25 @@ export async function datosGananciaPorDia(uid) {
   }
   const lista = [...dias.values()].sort((a, b) => (a.dia < b.dia ? 1 : -1))
   const herramientasPorDia = num(herr[0] && herr[0].m) / 30
-  return { dias: lista.map((d) => ({ ...d, ...netoDelDia(d) })), resumen: resumirDias(lista, herramientasPorDia), hayCobros: tarjeta.hayCobros, herramientasPorDia }
+  const primero = lista.length ? lista[lista.length - 1].dia : hoyBogota()
+  // Vista «por día de venta»: la ganancia de cada pedido en el día en que se vendió y la publicidad en el día en que Meta la gastó (con IVA).
+  const ES_PUB = /facebk|facebook|meta\s*ads|fb\.?me/i, vat = conMeta ? conMeta.vat : 19
+  const meta = new Map(gastoMeta.map((x) => [x.d, x.spend * (1 + vat / 100)])), primerMeta = gastoMeta.length ? gastoMeta.map((x) => x.d).sort()[0] : null
+  const pubTarjeta = new Map(), otrosTarjeta = new Map(), suma = (m, k, v) => m.set(k, (m.get(k) || 0) + v)
+  for (const x of tarjeta.lista) {
+    if (x.clase === 'meta' || x.clase === 'meta_monto' || x.clase === 'repetido' || (x.clase === 'otro' && ES_PUB.test(x.descripcion))) suma(pubTarjeta, x.fecha, x.monto)
+    else if (x.clase === 'otro') suma(otrosTarjeta, x.fecha, x.monto)
+  }
+  const costoDias = new Set([...lista.map((x) => x.dia), ...meta.keys(), ...pubTarjeta.keys(), ...otrosTarjeta.keys()])
+  const costos = [...costoDias].map((dia) => {
+    const d = dias.get(dia) || diaVacio(dia), usaMeta = primerMeta && dia >= primerMeta
+    return { dia, publicidad: usaMeta ? meta.get(dia) || 0 : pubTarjeta.get(dia) || 0, otros: d.devoluciones + d.comisiones + d.otrosDescuentos + d.pagosHerramientas + herramientasPorDia + (otrosTarjeta.get(dia) || 0) }
+  })
+  const pedidosV = ped.lista.map((x) => ({ creado: x.creado, contable: x.contable, ganancia: camp.gananciaPorPedido.get(x.idPedido) || 0 }))
+  const desdeV = [primero, ...pedidosV.map((x) => x.creado).filter(Boolean)].sort()[0]
+  const serieVenta = gananciaPorVenta(pedidosV.filter((x) => x.creado), costos, desdeV, hoyBogota())
+  const venta = { serie: serieVenta, costo: costoPorVentaReal(serieVenta), usaMeta: !!primerMeta }
+  return { venta, dias: lista.map((d) => ({ ...d, ...netoDelDia(d) })), resumen: resumirDias(lista, herramientasPorDia), hayCobros: tarjeta.hayCobros, herramientasPorDia, serie: acumuladoPorDia(lista, herramientasPorDia, primero, hoyBogota()) }
 }
 
 /** Caja: lo que Dropi dice que hay (tarjeta) y el saldo de la billetera según su último movimiento. */
@@ -178,13 +203,17 @@ export async function datosDashboard(uid) {
 /** Campañas con su resultado real (pedidos atribuidos por producto, ganancia de la billetera, devoluciones) y los productos disponibles para armarlas. */
 export async function datosCampanas(uid) {
   const inicio = await inicioDe(uid)
-  const [p, camps, gan, devs, prods] = await Promise.all([
+  const [p, camps, gan, devs, prods, gastos, [con]] = await Promise.all([
     datosPedidos(uid),
-    sql`SELECT id, name, product_ids, active FROM campaigns WHERE owner_id = ${uid} ORDER BY created_at, id`,
+    sql`SELECT id, name, product_ids, active, meta_campaign_id FROM campaigns WHERE owner_id = ${uid} ORDER BY created_at, id`,
     sql`SELECT w.order_ref, w.guide, w.amount::float8 AS amount FROM wallet_movements w WHERE w.owner_id = ${uid} AND w.kind = 'profit' AND NOT EXISTS (SELECT 1 FROM wallet_movements r WHERE r.owner_id = w.owner_id AND r.reverses = w.external_id)`,
     sql`SELECT order_ref, guide, amount::float8 AS amount FROM wallet_movements WHERE owner_id = ${uid} AND kind = 'return_fee'`,
     sql`SELECT status, created_date::text AS creado, product_ids, product_names FROM dropi_orders WHERE owner_id = ${uid}`,
+    sql`SELECT meta_campaign_id AS id, sum(spend)::float8 AS spend FROM meta_spend_daily WHERE owner_id = ${uid} AND day >= ${inicio} GROUP BY 1`,
+    sql`SELECT vat_pct::float8 AS vat FROM meta_connections WHERE owner_id = ${uid}`,
   ])
+  const vat = con ? con.vat : 19
+  const gastoMeta = new Map(gastos.map((g) => [g.id, g.spend]))
   // Lo real de la billetera por pedido: por ID de pedido o, si no lo trae, por guía.
   const porGuia = new Map(p.lista.filter((x) => x.guia).map((x) => [x.guia, x.idPedido]))
   const porPedido = (rows) => { const m = new Map(); for (const r of rows) { const id = r.order_ref || porGuia.get(r.guide); if (id) m.set(id, (m.get(id) || 0) + r.amount) } return m }
@@ -198,7 +227,7 @@ export async function datosCampanas(uid) {
   }
   const productosOrden = [...cuenta.values()].sort((a, b) => b.n - a.n || a.pid.localeCompare(b.pid))
   const nombreProd = new Map(productosOrden.map((x) => [x.pid, x.nombre]))
-  const defs = camps.map((c) => ({ id: String(c.id), nombre: c.name, activa: c.active, productIds: c.product_ids || [] }))
+  const defs = camps.map((c) => ({ id: String(c.id), nombre: c.name, activa: c.active, productIds: c.product_ids || [], metaId: c.meta_campaign_id || null, gasto: c.meta_campaign_id ? { sinIva: Math.round(gastoMeta.get(c.meta_campaign_id) || 0), conIva: Math.round((gastoMeta.get(c.meta_campaign_id) || 0) * (1 + vat / 100)) } : null }))
   const dueno = new Map() // producto → campaña que se lo queda (la más antigua)
   for (const c of defs) for (const id of c.productIds) if (!dueno.has(id)) dueno.set(id, c.nombre)
   return {
@@ -208,6 +237,14 @@ export async function datosCampanas(uid) {
     hayPedidos: p.lista.length > 0,
     gananciaPorPedido,
   }
+}
+
+/** Informe por día: pedidos vendidos (Dropi), entregados, en camino, devueltos, publicidad de Meta (con IVA) y ganancia cobrada de esas ventas. */
+function informeDe(lista, gananciaPorPedido, gastoPorDia, vat) {
+  const ped = lista.filter((x) => x.creado).map((x) => ({ creado: x.creado, contable: x.contable, ganancia: gananciaPorPedido.get(x.idPedido) || 0 }))
+  const costos = [...gastoPorDia].map(([dia, spend]) => ({ dia, publicidad: spend * (1 + vat / 100), otros: 0 }))
+  const dias = [...ped.map((x) => x.creado), ...costos.map((x) => x.dia)].sort()
+  return dias.length ? gananciaPorVenta(ped, costos, dias[0], hoyBogota()) : []
 }
 
 const cuentaDe = (lista) => { const c = {}; for (const p of lista) c[p.contable] = (c[p.contable] || 0) + 1; return c }
@@ -220,12 +257,31 @@ export async function datosCampana(uid, clave) {
   const [d, p] = await Promise.all([datosCampanas(uid), datosPedidos(uid)])
   const armar = (lista) => ({ lista, cuenta: cuentaDe(lista), hoy: lista.filter((x) => x.creado === hoyBogota()).length, billeteraDesde: p.billeteraDesde })
   const combos = (lista) => combosVendidos(lista, d.gananciaPorPedido) // lo vendido por combo (pedidos entregados) con la ganancia real de la billetera
-  if (clave === 'todos') return { clave, nombre: 'Todos los pedidos', conTabs: false, productos: [], r: null, pedidos: armar(p.lista), combos: combos(p.lista) }
+  if (clave === 'todos') {
+    const inicioT = await inicioDe(uid)
+    const [gastos, [conT]] = await Promise.all([sql`SELECT day::text AS d, SUM(spend)::float8 AS spend FROM meta_spend_daily WHERE owner_id = ${uid} AND day >= ${inicioT} GROUP BY day`, sql`SELECT vat_pct::float8 AS vat FROM meta_connections WHERE owner_id = ${uid}`])
+    return { clave, nombre: 'Todos los pedidos', conTabs: false, productos: [], r: null, pedidos: armar(p.lista), combos: combos(p.lista), informe: informeDe(p.lista, d.gananciaPorPedido, new Map(gastos.map((x) => [x.d, x.spend])), conT ? conT.vat : 19) }
+  }
   if (clave === 'sin') return { clave, nombre: 'Sin campaña', conTabs: false, productos: [], r: d.sinCampana, pedidos: armar(p.lista.filter((x) => !x.campanaId)), combos: combos(p.lista.filter((x) => !x.campanaId)) }
   const c = d.campanas.find((x) => x.id === clave)
   if (!c) return null
   const suyos = p.lista.filter((x) => x.campanaId === c.id)
-  return { ...c, clave, conTabs: true, pedidos: armar(suyos), combos: combos(suyos) }
+  const inicio = await inicioDe(uid)
+  const [[con], gasto] = await Promise.all([
+    sql`SELECT vat_pct::float8 AS vat FROM meta_connections WHERE owner_id = ${uid}`,
+    c.metaId ? sql`SELECT day::text AS d, spend::float8 AS spend, impressions::float8 AS imp, clicks::float8 AS clicks, purchases FROM meta_spend_daily WHERE owner_id = ${uid} AND meta_campaign_id = ${c.metaId} AND day >= ${inicio} ORDER BY day DESC` : [],
+  ])
+  const vat = con ? con.vat : 19
+  const primeroMeta = gasto.length ? gasto[gasto.length - 1].d : hoyBogota() // las filas vienen del día más nuevo al más viejo
+  const meta = { vinculada: !!c.metaId, vat, filas: gasto.map((x) => ({ ...x, conIva: Math.round(x.spend * (1 + vat / 100)) })), serie: serieMeta(gasto, primeroMeta, hoyBogota()), resumen: resumenMeta(gasto) }
+  // ¿Cuándo escalar?: últimos 7 días con gasto de Meta, con las ventas (pedidos) de la campaña de cada día y lo que de verdad deja cada pedido pagado.
+  const ventasDia = new Map()
+  for (const x of suyos) ventasDia.set(x.creado, (ventasDia.get(x.creado) || 0) + 1)
+  const diasEsc = meta.serie.filter((x) => x.gasto > 0).map((x) => ({ dia: x.dia, gasto: x.gasto, ventas: ventasDia.get(x.dia) || 0 }))
+  const margen = c.r && c.r.pagados > 0 ? (c.r.ganancia - c.r.costoDevoluciones) / c.r.pagados : null
+  const escalar = c.metaId ? evaluarEscalado({ dias: diasEsc, margen, vat }) : null
+  const informe = informeDe(suyos, d.gananciaPorPedido, new Map(gasto.map((x) => [x.d, x.spend])), vat)
+  return { ...c, clave, conTabs: true, pedidos: armar(suyos), combos: combos(suyos), meta, inicio, escalar, informe }
 }
 
 /** Meta Ads: estado de la conexión, gasto diario por campaña (sin IVA) y cobros (con IVA) con su cruce contra la tarjeta. Todo desde la fecha de inicio de la operación. */
@@ -234,14 +290,14 @@ export async function datosMeta(uid) {
   const [[con], filas, cobros, tj] = await Promise.all([
     sql`SELECT ad_account_id, account_name, currency, vat_pct::float8 AS vat, state, last_sync_ok_at, last_error FROM meta_connections WHERE owner_id = ${uid}`,
     sql`SELECT day::text AS d, meta_campaign_id AS id, campaign_name AS nombre, spend::float8 AS spend, impressions::float8 AS imp, clicks::float8 AS clicks, purchases, purchase_value::float8 AS pv FROM meta_spend_daily WHERE owner_id = ${uid} AND day >= ${inicio} ORDER BY day DESC, spend DESC`,
-    sql`SELECT id, charged_date::text AS d, amount::float8 AS amount, status, payment_ref, source FROM meta_charges WHERE owner_id = ${uid} AND charged_date >= ${inicio} ORDER BY charged_date DESC, id DESC`,
+    sql`SELECT id, charged_date::text AS d, amount::float8 AS amount, status, payment_ref, reference, notes, source FROM meta_charges WHERE owner_id = ${uid} AND charged_date >= ${inicio} ORDER BY charged_date DESC, id DESC`,
     datosTarjeta(uid),
   ])
   const vat = con ? con.vat : 19
   const sum = (f) => filas.reduce((a, x) => a + f(x), 0)
   const spend = sum((x) => x.spend)
   const sinTarjeta = new Set(tj.cobrosSinTarjeta.map((c) => String(c.id)))
-  const lista = cobros.map((c) => ({ id: String(c.id), fecha: c.d, monto: c.amount, ref: c.payment_ref || '', origen: c.source, estado: c.status === 'failed' ? 'fallido' : c.status === 'pending' ? 'pendiente' : sinTarjeta.has(String(c.id)) ? 'sin_tarjeta' : 'cruza' }))
+  const lista = cobros.map((c) => ({ id: String(c.id), fecha: c.d, monto: c.amount, ref: c.payment_ref || '', transaccion: c.reference || '', notas: c.notes || '', origen: c.source, estado: c.status === 'failed' ? 'fallido' : c.status === 'pending' ? 'pendiente' : sinTarjeta.has(String(c.id)) ? 'sin_tarjeta' : 'cruza' }))
   const cobrado = lista.filter((c) => c.estado === 'cruza' || c.estado === 'sin_tarjeta').reduce((a, c) => a + c.monto, 0)
   return {
     conectado: !!con, con: con ? { cuenta: con.ad_account_id, nombre: con.account_name, estado: con.state, ultimaSync: con.last_sync_ok_at ? new Date(con.last_sync_ok_at).getTime() : null, error: con.last_error } : null,
@@ -249,4 +305,15 @@ export async function datosMeta(uid) {
     tot: { spend: Math.round(spend), conIva: Math.round(spend * (1 + vat / 100)), imp: sum((x) => x.imp), clicks: sum((x) => x.clicks), compras: sum((x) => x.purchases), valorCompras: Math.round(sum((x) => x.pv)), dias: new Set(filas.map((x) => x.d)).size },
     cobros: lista, cobrado: Math.round(cobrado), sinTarjeta: lista.filter((c) => c.estado === 'sin_tarjeta').length,
   }
+}
+
+/** ¿Cuándo recupero?: lo que falta, lo que ya está vendido y pendiente de pago, y la fecha estimada con 60 / 80 / 100 % de entrega. */
+export async function datosRecuperacion(uid) {
+  const [dash, [lag]] = await Promise.all([
+    datosDashboard(uid),
+    sql`SELECT AVG(w.tx_date - o.created_date)::float8 AS dias, COUNT(*)::int AS n FROM wallet_movements w JOIN dropi_orders o ON o.owner_id = w.owner_id AND ((w.order_ref IS NOT NULL AND o.order_id = w.order_ref) OR (w.guide IS NOT NULL AND w.guide <> '' AND o.guide = w.guide)) WHERE w.owner_id = ${uid} AND w.kind = 'profit' AND o.created_date IS NOT NULL`,
+  ])
+  const gpp = dash.ganancia.venta.costo.gananciaPorPedido, hay = lag && lag.n > 0, lagDias = hay ? lag.dias : 7
+  const proy = dash.rec.faltan > 0 ? proyectarRecuperacion({ faltan: dash.rec.faltan, gananciaPorPedido: gpp, lagDias, pendientes: dash.pedidos.lista.map((x) => ({ creado: x.creado, contable: x.contable })), hoy: hoyBogota(), tasaBase: 0.6 }) : null // la base es prudente: entre los «en camino» hay pedidos con novedad que pueden terminar devueltos
+  return { rec: dash.rec, proy, lagDias: Math.round(lagDias), lagN: hay ? lag.n : 0, gananciaPorPedido: gpp, pedidos: dash.pedidos, enCamino: dash.enCamino }
 }

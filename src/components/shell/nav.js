@@ -23,6 +23,9 @@ export const SECCIONES = [
   { id: 'herramientas', etiqueta: 'Herramientas', items: [
     { href: '/calculadora', icono: 'percent', titulo: 'Calculadora', desc: 'Simula tus números antes de montar pauta para asegurar tu rentabilidad.' },
   ] },
+  { id: 'aprender', etiqueta: 'Aprender', items: [
+    { href: '/aprender', icono: 'book', titulo: 'Aprender', desc: 'Qué significa cada cifra, con ejemplos y cómo usarla para decidir' },
+  ] },
   { id: 'config', etiqueta: 'Configuración', items: [
     { href: '/configuracion', icono: 'box', titulo: 'Configuración', desc: 'Cuenta de Meta y herramientas mensuales', tabs: [
       { slug: '', titulo: 'Cuenta de Meta' },

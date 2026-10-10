@@ -1,7 +1,7 @@
 'use client'
 
 import TablaFiltrable from './TablaFiltrable'
-import { cop, diaCorto } from '@/lib/formato'
+import { cop, diaCorto, cpm, ctr, pct } from '@/lib/formato'
 
 // Las cuatro tablas de datos reales, cada una con sus columnas y estados. Reciben datos simples (listas) desde el servidor.
 const Chip = ({ t, children }) => <span className={'chip ' + t}>{children}</span>
@@ -90,31 +90,32 @@ export function TablaDias({ dias }) {
 const COBRO = { cruza: ['ok', 'Cruza con tu tarjeta'], sin_tarjeta: ['warn', 'Sin cargo en tu tarjeta'], fallido: ['bad', 'Cobro fallido'], pendiente: ['idle', 'Pendiente'] }
 
 export function TablaGastoMeta({ filas }) {
-  const camps = [...new Map(filas.map((x) => [x.id, x.nombre || 'Campaña ' + x.id])).entries()].map(([valor, etiqueta]) => ({ valor, etiqueta }))
-  const rows = filas.map((x) => ({ ...x, id: x.d + '|' + x.id, fecha: x.d, valor: x.spend, estado: x.id, texto: plano(x.nombre, x.spend, x.d) }))
+  const rows = filas.map((x) => ({ ...x, id: x.d, fecha: x.d, valor: x.spend, estado: 'x', texto: plano(x.spend, x.d) }))
   return (
-    <TablaFiltrable filas={rows} neutro estados={camps} unidad="filas de gasto" buscar="Buscar por campaña o monto…" vacio="Aún no hay gasto de Meta. Pulsa «Sincronizar» (arriba)."
+    <TablaFiltrable filas={rows} neutro unidad="días" buscar="Buscar por monto…" vacio="Aún no hay gasto de Meta."
       columnas={[
         { titulo: 'Día', izq: true, celda: (f) => diaCorto(f.fecha) },
-        { titulo: 'Campaña de Meta', txt: true, celda: (f) => f.nombre || '—' },
-        { titulo: 'Gasto (sin IVA)', celda: (f) => cop(f.spend) },
+        { titulo: 'Gastado (sin IVA)', celda: (f) => cop(f.spend) },
         { titulo: 'Con IVA', celda: (f) => cop(f.conIva) },
+        { titulo: 'CPM', celda: (f) => (f.imp > 0 ? cop(cpm(f.spend, f.imp)) : '—') },
+        { titulo: 'CTR', celda: (f) => (f.imp > 0 ? pct(ctr(f.clicks, f.imp)) : '—') },
         { titulo: 'Impresiones', celda: (f) => Math.round(f.imp).toLocaleString('es-CO') },
         { titulo: 'Clics', celda: (f) => Math.round(f.clicks).toLocaleString('es-CO') },
-        { titulo: 'Compras', celda: (f) => f.purchases },
       ]} />
   )
 }
 
-export function TablaCobrosMeta({ cobros }) {
-  const rows = cobros.map((c) => ({ ...c, valor: c.monto, texto: plano(c.ref, c.monto, c.fecha, COBRO[c.estado][1]) }))
+export function TablaCobrosMeta({ cobros, onQuitar }) {
+  const rows = cobros.map((c) => ({ ...c, valor: c.monto, texto: plano(c.ref, c.transaccion, c.monto, c.fecha, COBRO[c.estado][1]) }))
   return (
     <TablaFiltrable filas={rows} neutro estados={opciones(COBRO)} unidad="cobros" buscar="Buscar por referencia, monto o estado…" vacio="Aún no hay cobros de Meta."
       columnas={[
         { titulo: 'Fecha', izq: true, celda: (f) => diaCorto(f.fecha) },
-        { titulo: 'Referencia de pago', txt: true, celda: (f) => f.ref || <span className="muted">no la entrega Meta: se cruza por monto y fecha</span> },
+        { titulo: 'Referencia de pago', txt: true, celda: (f) => f.ref || <span className="muted">sin referencia: se cruza por monto y fecha</span> },
+        { titulo: 'Transacción', txt: true, celda: (f) => f.transaccion || <span className="muted">—</span> },
         { titulo: 'Importe (con IVA)', celda: (f) => cop(f.monto) },
         { titulo: 'Con tu tarjeta', izq: true, celda: (f) => <Chip t={COBRO[f.estado][0]}>{COBRO[f.estado][1]}</Chip> },
+        ...(onQuitar ? [{ titulo: '', izq: true, celda: (f) => <button className="btn ghost sm" onClick={() => onQuitar(f.id)}>Quitar</button> }] : []),
       ]} />
   )
 }

@@ -9,3 +9,8 @@ export const diaCorto = (d) => { if (!d) return '—'; const [, m, dd] = String(
 export const kshort = (n) => { const a = Math.abs(Math.round(Number(n) || 0)); return (n < 0 ? '−' : '+') + '$' + (a >= 1000 ? Math.round(a / 1000) + ' mil' : a) }
 /** Hace cuánto pasó algo (ms desde 1970): «hace 3 h». */
 export const hace = (ms) => { if (!ms) return 'nunca'; const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'hace un momento' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d` }
+
+// Métricas de anuncios (el gasto va sin IVA, como lo entrega Meta).
+export const cpm = (gasto, imp) => (imp > 0 ? (gasto / imp) * 1000 : 0) // costo por mil impresiones
+export const ctr = (clics, imp) => (imp > 0 ? (clics / imp) * 100 : 0) // % de impresiones que dieron un clic
+export const pct = (n) => (Math.round(n * 100) / 100).toLocaleString('es-CO') + ' %'
