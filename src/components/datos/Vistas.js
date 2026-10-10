@@ -14,6 +14,14 @@ const Kpi = ({ l, v, nota, color }) => (
 const Aviso = ({ tono = 'warn', titulo, children }) => (
   <div className={'tint ' + tono} style={{ marginBottom: 16 }}><b style={{ color: `var(--${tono === 'warn' ? 'gold' : tono === 'bad' ? 'coral' : tono === 'ok' ? 'jade' : 'blue'}-ink)` }}>{titulo}</b><div style={{ fontSize: 14.5, marginTop: 2 }}>{children}</div></div>
 )
+/** Qué período cubren los datos cargados. Si empiezan después de que arrancó la tarjeta, los totales están incompletos y se dice. */
+function Cobertura({ d }) {
+  if (!d.desde) return null
+  const tarde = d.desde > d.inicio
+  return tarde
+    ? <Aviso titulo={`Los datos empiezan el ${diaCorto(d.desde)}: faltan movimientos anteriores`}>Tu operación empezó el {diaCorto(d.inicio)}, así que los totales de abajo están <b>incompletos</b> (solo cubren del {diaCorto(d.desde)} al {diaCorto(d.hasta)}). Pulsa «Traer histórico desde el {diaCorto(d.inicio)}» en el panel de Dropi para completarlos.</Aviso>
+    : <p className="muted" style={{ fontSize: 13, margin: '0 0 12px' }}>Datos del {diaCorto(d.desde)} al {diaCorto(d.hasta)}.</p>
+}
 const LIMITE = 100
 const Mas = ({ total }) => total > LIMITE ? <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Mostrando los {LIMITE} más recientes de {fmtN(total)}.</p> : null
 
@@ -23,8 +31,11 @@ const CLASE = { meta: ['blue', 'De Meta · cruza con un cobro'], otro: ['idle', 
 export function VistaTarjeta({ d }) {
   if (!d.lista.length) return <Aviso tono="blue" titulo="Aún no hay movimientos de la tarjeta">Conecta Dropi y pulsa «Sincronizar ahora» (arriba) para traerlos.</Aviso>
   const t = d.totales
+  const dif = Math.round((t.recargas - d.deBilletera.monto) * 100) / 100
   return (
     <>
+      <Cobertura d={d} />
+      {Math.abs(dif) >= 1 && <Aviso titulo={dif > 0 ? 'A la tarjeta entró más de lo que salió de la billetera' : 'De la billetera salió más de lo que entró a la tarjeta'}>De la billetera salieron <b>{cop(d.deBilletera.monto)}</b> ({fmtN(d.deBilletera.n)} {d.deBilletera.n === 1 ? 'recarga' : 'recargas'}) y a la tarjeta entraron <b>{cop(t.recargas)}</b>: diferencia de {cop(Math.abs(dif))}. {dif > 0 ? 'Esa parte pudo venir de otro medio (PSE, tarjeta bancaria) o falta sincronizar la billetera.' : 'Puede haber una recarga que aún no aparece en la tarjeta.'}</Aviso>}
       {!d.hayCobros && <Aviso titulo="Todavía no hay cobros de Meta cargados">Por eso ningún cargo cruza: todos los gastos aparecen como «otros». Cuando se conecte Meta (o cargues sus cobros), los que traen la misma referencia de pago pasan a «De Meta».</Aviso>}
       {t.repetidos > 0 && <Aviso tono="bad" titulo={`${t.repetidos} ${t.repetidos === 1 ? 'cargo repite' : 'cargos repiten'} la referencia de un cobro de Meta`}>Puede ser un cobro doble. Reclámalo a Dropi.</Aviso>}
       {d.cobrosSinTarjeta.length > 0 && <Aviso titulo={`${d.cobrosSinTarjeta.length} ${d.cobrosSinTarjeta.length === 1 ? 'cobro de Meta no aparece' : 'cobros de Meta no aparecen'} en la tarjeta`}>Suman {cop(d.cobrosSinTarjeta.reduce((a, c) => a + c.monto, 0))}. Revisa si los pagó otra tarjeta.</Aviso>}
@@ -53,11 +64,12 @@ export function VistaBilletera({ d }) {
   const T = d.totales, s = (k) => (T[k] ? T[k].sum : 0)
   return (
     <>
+      <Cobertura d={d} />
       <div className="kpis" style={{ marginBottom: 16 }}>
         <Kpi l="En tu billetera hay" v={d.saldo == null ? '—' : cop(d.saldo)} nota="según el último movimiento" />
         <Kpi l="Ganancias de pedidos" v={cop(s('profit'))} nota={`${fmtN(T.profit ? T.profit.n : 0)} pedidos`} color="jade-ink" />
         <Kpi l="Devoluciones" v={cop(s('return_fee'))} nota={`${fmtN(T.return_fee ? T.return_fee.n : 0)} cobros`} color="coral-ink" />
-        <Kpi l="Pasado a tu tarjeta" v={cop(s('to_card'))} nota={`${fmtN(T.to_card ? T.to_card.n : 0)} recargas`} />
+        <Kpi l="Pasado a tu tarjeta" v={cop(s('to_card'))} nota={`${fmtN(T.to_card ? T.to_card.n : 0)} recargas · del ${diaCorto(d.desde)} al ${diaCorto(d.hasta)}`} />
       </div>
       <Tabla cols={[['Fecha'], ['Qué fue', 1], ['Detalle', 1], ['Valor'], ['Saldo después']]}>
         {d.mov.slice(0, LIMITE).map((m) => {

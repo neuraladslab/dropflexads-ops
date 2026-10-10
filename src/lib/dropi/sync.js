@@ -10,7 +10,9 @@ import { importCardRows } from './card-import'
 import { logActivity } from '@/lib/activity'
 import { MAX_IMPORT, todayCO } from '@/lib/util'
 import { getSetting } from '@/lib/settings'
-import { CARD_ID_RE, CARD_START, MAX_PAGES_PER_SYNC, MIN_SYNC_INTERVAL_S, PAGE_DELAY_MS, PAGE_SIZE, SYNC_BUDGET_MS, WINDOW_DAYS } from './config.mjs'
+import { calcularVentana } from '@/domain/ventana.ts'
+import { diaBogota } from '@/domain/fechas.ts'
+import { CARD_ID_RE, MAX_PAGES_PER_SYNC, MIN_SYNC_INTERVAL_S, PAGE_DELAY_MS, PAGE_SIZE, SYNC_BUDGET_MS, WINDOW_DAYS } from './config.mjs'
 import { DropiError, dropiRequest } from './client'
 import { dec, getToken, invalidateToken, recordReadFailure } from './session'
 
@@ -24,11 +26,15 @@ const daysBefore = (iso, n) => new Date(new Date(iso + 'T12:00:00Z').getTime() -
 
 const msg = (e) => (e instanceof DropiError ? { code: e.code, message: e.message, seconds: e.seconds || 0 } : { code: 'unexpected', message: 'No se pudo sincronizar con Dropi.', seconds: 0 })
 
-/** Ventana de la sincronización: { from, to } en ISO (7 días antes de hoy hasta hoy, hora de Colombia). */
-export const syncWindow = async (uid) => {
-  // La ventana empieza el día en que empezó tu operación (ajuste `op_from`; por defecto, cuando empezó a funcionar la tarjeta), con un tope de 120 días.
-  const to = todayCO(), op = (await getSetting(uid, 'op_from')) || CARD_START, floor = daysBefore(to, 120)
-  return { from: op && op <= to ? (op < floor ? floor : op) : daysBefore(to, WINDOW_DAYS), to }
+/**
+ * Ventana de la sincronización { from, to } (días de Bogotá). Sin opciones es la INCREMENTAL (desde 2 días antes de la última sincronización buena);
+ * `full` = histórico desde el inicio de la operación; `from`/`to` = un rango exacto pedido a mano. La regla está en domain/ventana.ts.
+ */
+export const syncWindow = async (uid, { from = null, to = null, full = false } = {}) => {
+  const inicio = (await getSetting(uid, 'op_from')) || OPERACION_INICIO
+  const [c] = await sql`SELECT last_sync_ok_at FROM dropi_connections WHERE owner_id = ${uid}`
+  const [hay] = await sql`SELECT 1 AS x FROM card_transactions WHERE owner_id = ${uid} LIMIT 1`
+  return calcularVentana({ hoy: todayCO(), inicioOperacion: inicio, ultimaSyncDia: c && c.last_sync_ok_at ? diaBogota(c.last_sync_ok_at) : null, hayDatos: !!hay, from, to, completo: full })
 }
 
 /** Descarta lo que cae fuera de la ventana y lo repetido (mismo identificador). Devuelve las filas únicas. */
@@ -48,10 +54,10 @@ export function windowAndDedupe(rows, { from, to }, seen = new Set()) {
 
 /** → { ok, skipped?, pages, inserted, updated, unchanged, invalid, window, error? }. Nunca lanza por errores de Dropi: los devuelve como `error`. */
 /**
- * `from` (ISO) fija el inicio de la ventana en vez de la de «Mi operación»; con `replace` se BORRAN los movimientos guardados de la tarjeta y se cargan de nuevo
+ * `from`/`to` piden un rango exacto y `full` el histórico desde el inicio de la operación (sin ellos, la ventana incremental). Con `replace` se BORRAN los movimientos guardados de la tarjeta y se cargan de nuevo
  * los leídos de Dropi, pero SOLO si la lectura salió completa y trajo movimientos (si algo falla, lo que había se conserva intacto).
  */
-export async function syncCardTransactions(uid, { budgetMs = SYNC_BUDGET_MS, ip = '', otp = '', from = '', replace = false } = {}) {
+export async function syncCardTransactions(uid, { budgetMs = SYNC_BUDGET_MS, ip = '', otp = '', from = null, to = null, full = false, replace = false } = {}) {
   // Reserva la sincronización de forma atómica: nada de dos a la vez ni más seguidas que el intervalo mínimo.
   const claim = await sql`
     UPDATE dropi_connections SET sync_started_at = NOW()
@@ -66,7 +72,7 @@ export async function syncCardTransactions(uid, { budgetMs = SYNC_BUDGET_MS, ip 
     return { ok: false, skipped: true, error: { code: 'busy', message: 'Ya se está sincronizando o se sincronizó hace un momento. Espera un poco.', seconds: wait } }
   }
   const cardId = dec(uid, 'card', claim[0].card_id_enc)
-  const win = from ? { from, to: todayCO() } : await syncWindow(uid)
+  const win = await syncWindow(uid, { from, to, full: full || replace }) // «reiniciar» siempre parte del inicio de la operación
   // Dropi fecha los movimientos de la tarjeta en hora UTC: después de las 7 p. m. en Colombia ya llevan la fecha de MAÑANA. Sin este día de margen,
   // una recarga o un cobro de la noche se descartaba por «pasar de hoy» y nunca entraba.
   const cardWin = { from: win.from, to: daysBefore(win.to, -1) }

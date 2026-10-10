@@ -64,8 +64,8 @@ export async function syncWalletRange(uid, token, from, to) {
 }
 
 /** → { ok, pages, read, inserted, unchanged, window, error? }. Nunca lanza por errores de Dropi. */
-export async function syncWalletMovements(uid, { ip = '' } = {}) {
-  const win = await syncWindow(uid), rows = [], seen = new Set()
+export async function syncWalletMovements(uid, { ip = '', win: ventana = null } = {}) {
+  const win = ventana || await syncWindow(uid), rows = [], seen = new Set()
   let pages = 0, read = 0, skipped = 0
   try {
     const token = await getToken(uid, { ip })

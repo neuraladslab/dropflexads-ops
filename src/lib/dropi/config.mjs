@@ -41,5 +41,5 @@ export const WINDOW_DAYS = 7                // cada sincronización trae solo de
 export const BLOCK_BACKOFF_S = [15 * 60, 60 * 60, 6 * 60 * 60]
 export const NETWORK_BACKOFF_S = [5 * 60, 15 * 60, 60 * 60]
 
-// La tarjeta empezó a funcionar este día: nada anterior existe. «Reiniciar tarjeta» trae todo desde aquí.
-export const CARD_START = '2026-09-21'
+// La operación empezó este día: nada anterior existe. El histórico y «Reiniciar tarjeta» traen todo desde aquí (el ajuste `op_from` de cada usuario lo puede cambiar).
+export const OPERACION_INICIO = '2026-09-26'

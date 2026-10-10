@@ -5,7 +5,8 @@ import { COOKIE_NAME } from './lib/auth/config.mjs'
 import { verifySessionToken } from './lib/auth/token.mjs'
 
 const PUBLIC_PAGES = new Set(['/login'])
-const PUBLIC_API = new Set(['/api/auth/login', '/api/auth/login/2fa', '/api/auth/logout'])
+// /api/cron/dropi no usa sesión: la protege el secreto CRON_SECRET (Bearer) dentro de la propia ruta.
+const PUBLIC_API = new Set(['/api/auth/login', '/api/auth/login/2fa', '/api/auth/logout', '/api/cron/dropi'])
 const IS_DEV = process.env.NODE_ENV === 'development'
 
 function csp(nonce) {

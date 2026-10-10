@@ -38,8 +38,8 @@ export async function importOrderRows(uid, rows) {
 }
 
 /** → { ok, pages, read, inserted, updated, window, error? }. Nunca lanza por errores de Dropi. */
-export async function syncOrders(uid, { ip = '' } = {}) {
-  const win = { from: coDay(-WINDOW_DAYS), to: coDay(0) }, rows = [], seen = new Set()
+export async function syncOrders(uid, { ip = '', win: ventana = null } = {}) {
+  const win = ventana || { from: coDay(-WINDOW_DAYS), to: coDay(0) }, rows = [], seen = new Set()
   let pages = 0, read = 0
   const t0 = Date.now()
   try {

@@ -4,13 +4,12 @@ import { logActivity } from '@/lib/activity'
 import { parseTotpInput } from '@/lib/auth/totp.mjs'
 import { confirmIdentity } from '@/lib/auth/reauth'
 import { clientIp, logAuthEvent, lockedSeconds, recordFailure, throttleKey } from '@/lib/auth/session'
-import { CARD_ID_RE, CARD_START } from '@/lib/dropi/config.mjs'
+import { CARD_ID_RE } from '@/lib/dropi/config.mjs'
 import { DropiError } from '@/lib/dropi/client'
 import { connectDropi } from '@/lib/dropi/session'
-import { syncCardTransactions } from '@/lib/dropi/sync'
-import { syncWalletMovements } from '@/lib/dropi/wallet-sync'
-import { syncCardBalance } from '@/lib/dropi/balance-sync'
-import { syncOrders } from '@/lib/dropi/orders-sync'
+import { sincronizarTodo } from '@/lib/dropi/sync-all'
+import { validarRango } from '@/domain/ventana.ts'
+import { todayCO } from '@/lib/util'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,7 +43,7 @@ export const GET = guard(async (_request, _ctx, session) => {
  * POST {action}
  *  · connect {appPassword, appCode?, email, password, cardId, otp | totp} → login de prueba en Dropi; guarda todo CIFRADO solo si funciona.
  *      `otp` = código de 6 dígitos de ahora (modo «código a mano»: NO se guarda la clave del autenticador); `totp` = clave del autenticador (modo automático).
- *  · sync {otp?}                                                    → trae los movimientos de los últimos 7 días (pausado, una petición a la vez).
+ *  · sync {otp?, historico?, from?, to?}                            → incremental (lo nuevo); `historico` = desde el inicio de la operación; `from`/`to` = un día o un rango.
  *      `otp` solo hace falta cuando no hay sesión activa y la cuenta está en modo «código a mano»; no se guarda en ningún sitio.
  *  · disconnect {appPassword, appCode?}                             → borra las credenciales y el token.
  */
@@ -63,14 +62,15 @@ export const POST = guard(async (request, _ctx, session) => {
     const otp = typeof b.otp === 'string' ? b.otp.replace(/\s+/g, '') : ''
     if (otp && !OTP_RE.test(otp)) return bad('El código debe tener 6 dígitos.')
     const ip = clientIp(request)
-    // «reset_card»: la tarjeta se borra y se vuelve a traer desde el día en que empezó a funcionar (CARD_START), cruzando de nuevo con los cobros de Meta.
-    const r = action === 'reset_card' ? await syncCardTransactions(uid, { ip, otp, from: CARD_START, replace: true, budgetMs: 40_000 }) : await syncCardTransactions(uid, { ip, otp })
-    // La billetera se lee con la sesión que la tarjeta acaba de usar (sin otro inicio de sesión). Si falla, la tarjeta queda igual de bien sincronizada.
-    if (action === 'reset_card' && r.ok) await logActivity(uid, r.replaced ? `Reiniciaste la tarjeta: se borró lo guardado y se cargaron ${r.inserted} movimientos desde ${CARD_START}` : 'Intentaste reiniciar la tarjeta pero Dropi no devolvió movimientos: no se borró nada')
-    const balance = r.ok ? await syncCardBalance(uid, { ip }) : null // el saldo que informa Dropi: la fuente de verdad del disponible
-    const wallet = r.ok ? await syncWalletMovements(uid, { ip }) : null
-    const orders = r.ok ? await syncOrders(uid, { ip }) : null // el estado real de cada pedido (entregado, devolución…), con la misma sesión
-    return ok(wallet ? { ...r, balance, wallet, orders } : r)
+    let modo = action === 'reset_card' ? 'reset' : b.historico === true ? 'historico' : 'incremental', from = null, to = null
+    if (action === 'sync' && b.from) { // sincronizar un día o entre fechas
+      const err = validarRango(b.from, b.to, todayCO())
+      if (err) return bad(err)
+      modo = 'rango'; from = b.from; to = b.to || b.from
+    }
+    const r = await sincronizarTodo(uid, { ip, otp, modo, from, to })
+    if (action === 'reset_card' && r.ok) await logActivity(uid, r.replaced ? `Reiniciaste la tarjeta: se borró lo guardado y se cargaron ${r.inserted} movimientos desde ${r.window.from}` : 'Intentaste reiniciar la tarjeta pero Dropi no devolvió movimientos: no se borró nada')
+    return ok(r)
   }
 
   // Primero lo barato (validar el cuerpo); la contraseña de la app usa scrypt (caro) y va después.

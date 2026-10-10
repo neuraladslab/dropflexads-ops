@@ -118,3 +118,31 @@ test("ganancia por día: suma de días y veredicto del período", () => {
   assert.equal(r.neto, 400000 - (450000 + 20000 + 10000 + 2000)); // -82000
   assert.equal(r.veredicto, "pierde");
 });
+
+import { calcularVentana, validarRango } from "./ventana.ts";
+
+test("ventana: primera vez y «histórico» parten del inicio de la operación", () => {
+  const base = { hoy: "2026-10-10", inicioOperacion: "2026-09-26", hayDatos: false };
+  assert.deepEqual(calcularVentana(base), { from: "2026-09-26", to: "2026-10-10" });
+  assert.deepEqual(calcularVentana({ ...base, hayDatos: true, ultimaSyncDia: "2026-10-09", completo: true }), { from: "2026-09-26", to: "2026-10-10" });
+});
+test("ventana: incremental solapa 2 días y nunca pasa del inicio de la operación", () => {
+  const e = { hoy: "2026-10-10", inicioOperacion: "2026-09-26", hayDatos: true };
+  assert.deepEqual(calcularVentana({ ...e, ultimaSyncDia: "2026-10-09" }), { from: "2026-10-07", to: "2026-10-10" });
+  assert.deepEqual(calcularVentana({ ...e, ultimaSyncDia: "2026-09-27" }), { from: "2026-09-26", to: "2026-10-10" });
+});
+test("ventana: un día o un rango exacto, con tope de 120 días", () => {
+  const e = { hoy: "2026-10-10", inicioOperacion: "2026-09-26", hayDatos: true, ultimaSyncDia: "2026-10-09" };
+  assert.deepEqual(calcularVentana({ ...e, from: "2026-09-30", to: "2026-09-30" }), { from: "2026-09-30", to: "2026-09-30" });
+  assert.deepEqual(calcularVentana({ ...e, from: "2026-09-28" }), { from: "2026-09-28", to: "2026-10-10" });
+  assert.equal(calcularVentana({ ...e, from: "2025-01-01" }).from, "2026-06-12"); // hoy − 120 días
+});
+test("validarRango: mensajes claros", () => {
+  const hoy = "2026-10-10";
+  assert.equal(validarRango("2026-09-26", "2026-10-02", hoy), null);
+  assert.equal(validarRango("2026-09-26", "", hoy), null); // un día
+  assert.match(validarRango("26/09/2026", "", hoy)!, /desde/);
+  assert.match(validarRango("2026-10-05", "2026-10-01", hoy)!, /anterior/);
+  assert.match(validarRango("2026-09-26", "2026-10-11", hoy)!, /futura/);
+  assert.match(validarRango("2026-01-01", "2026-10-10", hoy)!, /120/);
+});

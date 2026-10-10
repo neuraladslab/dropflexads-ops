@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Icono } from '@/components/shell/Icono'
+import { OPERACION_INICIO } from '@/lib/dropi/config.mjs'
+import { diaCorto } from '@/lib/formato'
 
 // Mismo diseño que el panel de Dropi de la app original: tarjeta horizontal a todo el ancho (estado a la izquierda, botones a la derecha),
 // versión compacta minimizable y diálogos para conectar y desconectar.
@@ -13,6 +15,8 @@ const hace = (ms) => {
   return m < 1 ? 'hace un momento' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`
 }
 const espera = (s) => (s >= 3600 ? Math.ceil(s / 3600) + ' h' : Math.max(1, Math.ceil(s / 60)) + ' min')
+const INICIO = diaCorto(OPERACION_INICIO) // «26 sep»
+const hoyISO = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10)
 const cop = (n) => '$' + Math.round(n).toLocaleString('es-CO')
 const ls = {
   get: (k) => { try { return localStorage.getItem(k) } catch { return null } },
@@ -179,6 +183,7 @@ export default function ConexionDropi() {
   const [trabajando, setTrabajando] = useState('')
   const [otp, setOtp] = useState('')
   const [resultado, setResultado] = useState(null)
+  const [rango, setRango] = useState(null) // null = cerrado; { from, to } = formulario «por fechas» abierto
 
   useEffect(() => { setMin(ls.get('ops-dropi-min') !== '0') }, [])
   const alternarMin = () => setMin((m) => { ls.set('ops-dropi-min', m ? '0' : '1'); return !m })
@@ -187,11 +192,11 @@ export default function ConexionDropi() {
   }, [])
   useEffect(() => { cargar() }, [cargar])
 
-  async function accion(nombre, textoEspera) {
-    if (nombre === 'reset_card' && !window.confirm('Se BORRARÁN los movimientos guardados de la tarjeta y se volverán a traer desde Dropi desde el 21 de septiembre de 2026.\n\nSi Dropi falla o no trae movimientos, no se borra nada. ¿Continuar?')) return
+  async function accion(nombre, textoEspera, extra = {}) {
+    if (nombre === 'reset_card' && !window.confirm(`Se BORRARÁN los movimientos guardados de la tarjeta y se volverán a traer desde Dropi desde el ${INICIO} (inicio de tu operación).\n\nSi Dropi falla o no trae movimientos, no se borra nada. ¿Continuar?`)) return
     if (d && d.needsOtp && !/^\d{6,8}$/.test(otp)) { setResultado({ error: { message: 'Escribe el código de 6 dígitos de tu autenticador de Dropi para iniciar sesión.' } }); return }
     setTrabajando(textoEspera); setResultado(null)
-    try { setResultado(await llamar('POST', { action: nombre, ...(otp ? { otp } : {}) })) }
+    try { setResultado(await llamar('POST', { action: nombre, ...extra, ...(otp ? { otp } : {}) })) }
     catch (e) { setResultado({ error: { message: e.message } }) }
     finally { setOtp(''); setTrabajando(''); cargar(); router.refresh() } // las listas de abajo se leen en el servidor
   }
@@ -237,7 +242,9 @@ export default function ConexionDropi() {
           </div>
           <div className="rowbtns">
             {otpInput}{sync}
-            <button className="btn ghost sm" disabled={!puede} onClick={() => accion('reset_card', 'Trayendo la tarjeta completa desde el 21 de septiembre… (puede tardar un minuto)')} title="Borra los movimientos guardados de la tarjeta y los vuelve a traer desde el 21 de septiembre">Reiniciar desde el 21 de sept.</button>
+            <button className="btn ghost sm" disabled={!puede} onClick={() => accion('sync', `Trayendo el histórico desde el ${INICIO}… (puede tardar un minuto)`, { historico: true })} title="Trae todo lo que pasó desde el inicio de tu operación. No borra nada y no duplica.">Traer histórico desde el {INICIO}</button>
+            <button className="btn ghost sm" disabled={!puede} aria-expanded={!!rango} onClick={() => setRango((r) => (r ? null : { from: hoyISO(), to: '' }))}>Por fechas</button>
+            <button className="btn ghost sm" disabled={!puede} onClick={() => accion('reset_card', `Trayendo la tarjeta completa desde el ${INICIO}… (puede tardar un minuto)`)} title={`Borra los movimientos guardados de la tarjeta y los vuelve a traer desde el ${INICIO}`}>Reiniciar desde el {INICIO}</button>
             <button className="btn ghost sm" onClick={() => setDialogo('conectar')}>{d.state === 'reauth' ? 'Reconectar' : 'Cambiar datos'}</button>
             <button className="btn ghost sm" style={{ color: 'var(--coral-ink)', borderColor: '#FECACA' }} onClick={() => setDialogo('desconectar')}>Desconectar</button>
             {alternador(false)}
@@ -248,6 +255,15 @@ export default function ConexionDropi() {
   return (
     <>
       {panel}
+      {rango && d && d.connected && (
+        <form className="card" style={{ marginBottom: 16, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}
+          onSubmit={(e) => { e.preventDefault(); accion('sync', rango.to && rango.to !== rango.from ? `Sincronizando del ${diaCorto(rango.from)} al ${diaCorto(rango.to)}…` : `Sincronizando el ${diaCorto(rango.from)}…`, { from: rango.from, ...(rango.to ? { to: rango.to } : {}) }) }}>
+          <div className="field" style={{ minWidth: 160 }}><label htmlFor="sr-from">Desde</label><div className="inp"><input id="sr-from" type="date" min="2020-01-01" max={hoyISO()} required value={rango.from} onChange={(e) => setRango((r) => ({ ...r, from: e.target.value }))} /></div></div>
+          <div className="field" style={{ minWidth: 160 }}><label htmlFor="sr-to">Hasta <span className="muted">(opcional)</span></label><div className="inp"><input id="sr-to" type="date" min={rango.from || '2020-01-01'} max={hoyISO()} value={rango.to} onChange={(e) => setRango((r) => ({ ...r, to: e.target.value }))} /></div></div>
+          <button className="btn sm" type="submit" disabled={!!trabajando || !rango.from}>{rango.to && rango.to !== rango.from ? 'Sincronizar ese rango' : 'Sincronizar ese día'}</button>
+          <span className="muted only-learner" style={{ fontSize: 13, flex: 1, minWidth: 220 }}>Para un solo día, deja «Hasta» vacío. Trae la tarjeta y la billetera de esas fechas y los pedidos creados en ellas (máximo 120 días). No borra nada.</span>
+        </form>
+      )}
       <Resultado r={resultado} />
       {dialogo === 'conectar' && <DialogoConectar onCerrar={() => setDialogo(null)} onListo={() => { setDialogo(null); cargar(); router.refresh() }} />}
       {dialogo === 'desconectar' && <DialogoDesconectar onCerrar={() => setDialogo(null)} onListo={() => { setDialogo(null); setResultado(null); cargar(); router.refresh() }} />}
