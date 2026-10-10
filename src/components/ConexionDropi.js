@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Icono } from '@/components/shell/Icono'
-import { OPERACION_INICIO } from '@/lib/dropi/config.mjs'
 import { diaCorto } from '@/lib/formato'
 
 // Mismo diseño que el panel de Dropi de la app original: tarjeta horizontal a todo el ancho (estado a la izquierda, botones a la derecha),
@@ -15,7 +14,6 @@ const hace = (ms) => {
   return m < 1 ? 'hace un momento' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`
 }
 const espera = (s) => (s >= 3600 ? Math.ceil(s / 3600) + ' h' : Math.max(1, Math.ceil(s / 60)) + ' min')
-const INICIO = diaCorto(OPERACION_INICIO) // «26 sep»
 const hoyISO = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10)
 const cop = (n) => '$' + Math.round(n).toLocaleString('es-CO')
 const ls = {
@@ -183,8 +181,10 @@ export default function ConexionDropi() {
   const [trabajando, setTrabajando] = useState('')
   const [otp, setOtp] = useState('')
   const [resultado, setResultado] = useState(null)
+  const [edit, setEdit] = useState({ valor: '', guardando: false, msg: '', error: false })
   const [rango, setRango] = useState(null) // null = cerrado; { from, to } = formulario «por fechas» abierto
 
+  const INICIO = diaCorto(d && d.opFrom) // fecha de inicio elegida por la persona, p. ej. «26 sep»
   useEffect(() => { setMin(ls.get('ops-dropi-min') !== '0') }, [])
   const alternarMin = () => setMin((m) => { ls.set('ops-dropi-min', m ? '0' : '1'); return !m })
   const cargar = useCallback(async () => {
@@ -193,12 +193,22 @@ export default function ConexionDropi() {
   useEffect(() => { cargar() }, [cargar])
 
   async function accion(nombre, textoEspera, extra = {}) {
-    if (nombre === 'reset_card' && !window.confirm(`Se BORRARÁN los movimientos guardados de la tarjeta y se volverán a traer desde Dropi desde el ${INICIO} (inicio de tu operación).\n\nSi Dropi falla o no trae movimientos, no se borra nada. ¿Continuar?`)) return
+    if (nombre === 'reset_card' && !window.confirm(`Se BORRARÁN los movimientos guardados de la tarjeta y se volverán a traer desde Dropi desde el ${INICIO} (la fecha de inicio que configuraste).\n\nSi Dropi falla o no trae movimientos, no se borra nada. ¿Continuar?`)) return
     if (d && d.needsOtp && !/^\d{6,8}$/.test(otp)) { setResultado({ error: { message: 'Escribe el código de 6 dígitos de tu autenticador de Dropi para iniciar sesión.' } }); return }
     setTrabajando(textoEspera); setResultado(null)
     try { setResultado(await llamar('POST', { action: nombre, ...extra, ...(otp ? { otp } : {}) })) }
     catch (e) { setResultado({ error: { message: e.message } }) }
     finally { setOtp(''); setTrabajando(''); cargar(); router.refresh() } // las listas de abajo se leen en el servidor
+  }
+
+  async function guardarInicio(e) {
+    e.preventDefault()
+    setEdit((x) => ({ ...x, guardando: true, msg: '', error: false }))
+    try {
+      const r = await llamar('POST', { action: 'set_start', from: edit.valor })
+      await cargar(); router.refresh()
+      setEdit({ valor: '', guardando: false, error: false, msg: `Listo: ahora se sincroniza desde el ${diaCorto(r.opFrom)}. Pulsa «Traer histórico desde el ${diaCorto(r.opFrom)}» para cargar los movimientos desde esa fecha (lo que ya tenías no se borra).` })
+    } catch (ex) { setEdit((x) => ({ ...x, guardando: false, error: true, msg: ex.message })) }
   }
 
   const caja = (hijos, mini) => (
@@ -236,7 +246,13 @@ export default function ConexionDropi() {
           <div style={{ minWidth: 260 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><b>Dropi</b>{st}</div>
             <div className="muted" style={{ fontSize: 13.5, marginTop: 4 }}>Tarjeta {d.cardHint} · cuenta {d.emailHint} · última sincronización {hace(d.lastSyncOkAt)} · {d.mode === 'otp' ? 'código a mano (no guardo la clave de tu autenticador)' : 'código automático'}</div>
-            <div className="muted" style={{ fontSize: 13.5 }}>Cada sincronización trae los movimientos desde el inicio de tu operación, tu billetera y el estado de tus pedidos.</div>
+            <div className="muted" style={{ fontSize: 13.5 }}>Cada sincronización trae la tarjeta, la billetera y el estado de tus pedidos <b style={{ color: 'var(--ink)' }}>desde el {INICIO}</b>.</div>
+            <form onSubmit={guardarInicio} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+              <label htmlFor="op-from" className="muted" style={{ fontSize: 13.5 }}>Sincronizar desde:</label>
+              <div className="inp" style={{ padding: '0 10px' }}><input id="op-from" type="date" min="2020-01-01" max={hoyISO()} required value={edit.valor || d.opFrom || ''} onChange={(e) => setEdit((x) => ({ ...x, valor: e.target.value, msg: '' }))} style={{ fontSize: 15, padding: '8px 0' }} /></div>
+              <button className="btn ghost sm" type="submit" disabled={edit.guardando || !edit.valor || edit.valor === d.opFrom}>{edit.guardando ? 'Guardando…' : 'Guardar fecha'}</button>
+            </form>
+            {edit.msg && <div role="status" style={{ fontSize: 13.5, marginTop: 4, color: edit.error ? 'var(--coral-ink)' : 'var(--jade-ink)', maxWidth: 560 }}>{edit.msg}</div>}
             {d.lastError && d.state !== 'ok' && <div style={{ fontSize: 13.5, color: 'var(--coral-ink)', marginTop: 2 }}>{d.lastError}</div>}
             <div style={{ marginTop: 4 }}>{msg}</div>
           </div>

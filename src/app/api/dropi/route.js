@@ -8,7 +8,9 @@ import { CARD_ID_RE } from '@/lib/dropi/config.mjs'
 import { DropiError } from '@/lib/dropi/client'
 import { connectDropi } from '@/lib/dropi/session'
 import { sincronizarTodo } from '@/lib/dropi/sync-all'
-import { validarRango } from '@/domain/ventana.ts'
+import { validarRango, validarInicio } from '@/domain/ventana.ts'
+import { getSetting, setSetting } from '@/lib/settings'
+import { OPERACION_INICIO } from '@/lib/dropi/config.mjs'
 import { todayCO } from '@/lib/util'
 
 export const runtime = 'nodejs'
@@ -25,12 +27,13 @@ const fail = (e) => {
 
 /** Estado de la conexión. NUNCA devuelve credenciales, token ni el ID completo de la tarjeta: solo pistas enmascaradas. */
 export const GET = guard(async (_request, _ctx, session) => {
+  const opFrom = (await getSetting(session.userId, 'op_from')) || OPERACION_INICIO
   const [c] = await sql`SELECT email_hint, card_hint, state, (totp_enc IS NULL) AS manual_otp, cooldown_until, last_sync_at, last_sync_ok_at, next_page, last_error, sync_started_at,
                                (token_exp IS NOT NULL AND token_exp > NOW()) AS session_ok FROM dropi_connections WHERE owner_id = ${session.userId}`
-  if (!c) return ok({ connected: false })
+  if (!c) return ok({ connected: false, opFrom })
   const left = c.cooldown_until ? Math.max(0, Math.ceil((new Date(c.cooldown_until).getTime() - Date.now()) / 1000)) : 0
   return ok({
-    connected: true, emailHint: c.email_hint, cardHint: c.card_hint, state: c.state, cooldownSeconds: left,
+    opFrom, connected: true, emailHint: c.email_hint, cardHint: c.card_hint, state: c.state, cooldownSeconds: left,
     lastSyncAt: c.last_sync_at ? new Date(c.last_sync_at).getTime() : null, lastSyncOkAt: c.last_sync_ok_at ? new Date(c.last_sync_ok_at).getTime() : null,
     lastError: c.last_error || null, sessionActive: !!c.session_ok,
     // «otp»: no se guarda la clave del autenticador y, sin sesión activa, la persona escribe el código al sincronizar; «auto»: se genera solo.
@@ -51,7 +54,16 @@ export const POST = guard(async (request, _ctx, session) => {
   const uid = session.userId
   const b = await readBody(request)
   const action = b?.action
-  if (!['connect', 'sync', 'reset_card', 'disconnect'].includes(action)) return bad('Acción no válida.')
+  if (!['connect', 'sync', 'reset_card', 'disconnect', 'set_start'].includes(action)) return bad('Acción no válida.')
+
+  // Fecha desde la que se traen los datos de Dropi (tarjeta y billetera). Solo cambia el ajuste: no borra nada ni llama a Dropi.
+  if (action === 'set_start') {
+    const err = validarInicio(b.from, todayCO())
+    if (err) return bad(err)
+    await setSetting(uid, 'op_from', b.from)
+    await logActivity(uid, `Cambiaste la fecha desde la que se sincroniza Dropi: ${b.from}`)
+    return ok({ opFrom: b.from })
+  }
 
   if (action === 'sync' || action === 'reset_card') {
     // Tope por hora además del intervalo mínimo de la propia sincronización.

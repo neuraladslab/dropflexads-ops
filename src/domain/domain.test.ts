@@ -146,3 +146,15 @@ test("validarRango: mensajes claros", () => {
   assert.match(validarRango("2026-09-26", "2026-10-11", hoy)!, /futura/);
   assert.match(validarRango("2026-01-01", "2026-10-10", hoy)!, /120/);
 });
+
+import { validarInicio } from "./ventana.ts";
+
+test("validarInicio: fecha desde la que se sincroniza", () => {
+  const hoy = "2026-10-10";
+  assert.equal(validarInicio("2026-09-26", hoy), null);
+  assert.equal(validarInicio("2026-10-10", hoy), null);
+  assert.match(validarInicio("2026-10-11", hoy)!, /futura/);
+  assert.match(validarInicio("26/09/2026", hoy)!, /válida/);
+  assert.match(validarInicio("2026-01-01", hoy)!, /120/);
+  assert.match(validarInicio(undefined, hoy)!, /válida/);
+});

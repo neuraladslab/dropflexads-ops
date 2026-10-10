@@ -6,8 +6,11 @@ import { clasificarPedidos } from '@/domain/pedidos.ts'
 import { diaVacio, resumirDias, netoDelDia } from '@/domain/porDia.ts'
 import { hoyBogota } from '@/domain/fechas.ts'
 import { OPERACION_INICIO } from '@/lib/dropi/config.mjs'
+import { getSetting } from '@/lib/settings'
 
 const num = (v) => Number(v) || 0
+/** Fecha desde la que el usuario sincroniza Dropi (ajuste `op_from`; por defecto, el inicio de la operación). */
+const inicioDe = async (uid) => (await getSetting(uid, 'op_from')) || OPERACION_INICIO
 
 /** Movimientos de la tarjeta con su clase tras el cruce con los cobros de Meta (por referencia de pago). */
 export async function datosTarjeta(uid) {
@@ -28,7 +31,7 @@ export async function datosTarjeta(uid) {
   const fechas = lista.map((x) => x.fecha).sort()
   const [aCard] = fechas.length ? await sql`SELECT COALESCE(SUM(amount), 0)::float8 AS s, COUNT(*)::int AS n FROM wallet_movements WHERE owner_id = ${uid} AND kind = 'to_card' AND tx_date >= ${fechas[0]}` : [{ s: 0, n: 0 }]
   return {
-    inicio: OPERACION_INICIO, desde: fechas[0] || null, hasta: fechas[fechas.length - 1] || null,
+    inicio: await inicioDe(uid), desde: fechas[0] || null, hasta: fechas[fechas.length - 1] || null,
     deBilletera: { monto: aCard.s, n: aCard.n }, // lo que la billetera dice haber pasado a la tarjeta, en el mismo período
     lista, hayCobros: cobros.length > 0, cobrosSinTarjeta: r.cobrosSinTarjeta,
     totales: { recargas: suma((x) => x.clase === 'recarga'), meta: r.totalMeta, otros: r.totalOtros, rechazados: lista.filter((x) => x.clase === 'rechazado').length, repetidos: r.repetidos.length },
@@ -44,7 +47,7 @@ export async function datosBilletera(uid) {
   ])
   const [rg] = await sql`SELECT MIN(tx_date)::text AS desde, MAX(tx_date)::text AS hasta FROM wallet_movements WHERE owner_id = ${uid}`
   const saldo = ult && ult.before != null ? Math.round((ult.before + (ult.direction === 'in' ? ult.amount : -ult.amount)) * 100) / 100 : null
-  return { inicio: OPERACION_INICIO, desde: rg && rg.desde, hasta: rg && rg.hasta, mov, totales: Object.fromEntries(tot.map((t) => [t.kind, { n: t.n, sum: t.sum }])), saldo }
+  return { inicio: await inicioDe(uid), desde: rg && rg.desde, hasta: rg && rg.hasta, mov, totales: Object.fromEntries(tot.map((t) => [t.kind, { n: t.n, sum: t.sum }])), saldo }
 }
 
 /** Pedidos de Dropi con su estado contable (cruzando con la billetera por ID de pedido o guía). */

@@ -41,3 +41,12 @@ export function validarRango(from: unknown, to: unknown, hoy: string): string | 
   if ((Date.parse(hasta + "T12:00:00Z") - Date.parse(from + "T12:00:00Z")) / 864e5 > MAX_DIAS) return `El rango no puede pasar de ${MAX_DIAS} días.`;
   return null;
 }
+
+/** Valida la fecha desde la que se sincronizan los datos de Dropi (tarjeta y billetera). Devuelve el mensaje de error, o null si está bien. */
+export function validarInicio(from: unknown, hoy: string): string | null {
+  if (typeof from !== "string" || !FECHA.test(from)) return "Escribe una fecha válida.";
+  if (from > hoy) return "La fecha no puede ser futura.";
+  const piso = sumarDias(hoy, -MAX_DIAS);
+  if (from < piso) return `Solo se pueden traer datos de hasta ${MAX_DIAS} días atrás (desde el ${piso}).`;
+  return null;
+}
