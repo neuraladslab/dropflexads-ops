@@ -26,16 +26,16 @@ const inicioDe = inicioOperacion
 export async function datosTarjeta(uid) {
   const inicio = await inicioDe(uid)
   const [rows, cobros] = await Promise.all([
-    sql`SELECT id, tx_date::text AS d, amount::float8 AS amount, kind, status, description, pay_ref, manual_charge_id, decline_reason FROM card_transactions WHERE owner_id = ${uid} AND tx_date >= ${inicio} ORDER BY tx_date DESC, id DESC`,
+    sql`SELECT id, tx_date::text AS d, amount::float8 AS amount, kind, status, description, pay_ref, manual_charge_id, decline_reason, ignored FROM card_transactions WHERE owner_id = ${uid} AND tx_date >= ${inicio} ORDER BY tx_date DESC, id DESC`,
     sql`SELECT id, charged_date::text AS d, amount::float8 AS amount, status, payment_ref FROM meta_charges WHERE owner_id = ${uid}`,
   ])
-  const mov = rows.map((r) => ({ id: String(r.id), fecha: r.d, tipo: r.kind === 'refund' ? 'abono' : 'cargo', estado: r.status === 'approved' ? 'aprobado' : 'rechazado', monto: r.amount, refPago: r.pay_ref, cobroManualId: r.manual_charge_id ? String(r.manual_charge_id) : null }))
+  const mov = rows.filter((r) => !r.ignored).map((r) => ({ id: String(r.id), fecha: r.d, tipo: r.kind === 'refund' ? 'abono' : 'cargo', estado: r.status === 'approved' ? 'aprobado' : 'rechazado', monto: r.amount, refPago: r.pay_ref, cobroManualId: r.manual_charge_id ? String(r.manual_charge_id) : null }))
   const ch = cobros.map((c) => ({ id: String(c.id), fecha: c.d, refPago: c.payment_ref, monto: c.amount, estado: c.status === 'paid' ? 'pagado' : c.status === 'failed' ? 'fallido' : 'pendiente' }))
   const r = cruzar(mov, ch)
   const meta = new Set(r.meta.map((m) => m.id)), rep = new Set(r.repetidos.map((m) => m.id)), porMonto = new Set(r.porMonto.map((m) => m.id))
   const lista = rows.map((x) => {
     const id = String(x.id)
-    const clase = x.status !== 'approved' ? 'rechazado' : x.kind === 'refund' ? 'recarga' : rep.has(id) ? 'repetido' : porMonto.has(id) ? 'meta_monto' : meta.has(id) ? 'meta' : 'otro'
+    const clase = x.ignored ? 'ignorado' : x.status !== 'approved' ? 'rechazado' : x.kind === 'refund' ? 'recarga' : rep.has(id) ? 'repetido' : porMonto.has(id) ? 'meta_monto' : meta.has(id) ? 'meta' : 'otro'
     return { id, fecha: x.d, monto: x.amount, descripcion: x.description || '', refPago: x.pay_ref || '', clase, motivo: x.decline_reason || '' }
   })
   const suma = (f) => lista.filter(f).reduce((a, x) => a + x.monto, 0)
@@ -46,7 +46,7 @@ export async function datosTarjeta(uid) {
     inicio, desde: fechas[0] || null, hasta: fechas[fechas.length - 1] || null,
     deBilletera: { monto: aCard.s, n: aCard.n }, // lo que la billetera dice haber pasado a la tarjeta, en el mismo período
     lista, hayCobros: cobros.length > 0, cobrosSinTarjeta: r.cobrosSinTarjeta,
-    totales: { recargas: suma((x) => x.clase === 'recarga'), meta: r.totalMeta, otros: r.totalOtros, rechazados: lista.filter((x) => x.clase === 'rechazado').length, repetidos: r.repetidos.length },
+    totales: { recargas: suma((x) => x.clase === 'recarga'), meta: r.totalMeta, otros: r.totalOtros, rechazados: lista.filter((x) => x.clase === 'rechazado').length, ignorados: lista.filter((x) => x.clase === 'ignorado').length, repetidos: r.repetidos.length },
   }
 }
 

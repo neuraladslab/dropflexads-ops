@@ -51,7 +51,7 @@ function MultiEstado({ estados, cuenta, valor, onChange }) {
   )
 }
 
-export default function TablaFiltrable({ filas, columnas, estados, buscar = 'Buscar por descripción, referencia o monto…', unidad = 'movimientos', vacio = 'No hay nada para mostrar.', sinFecha = false, neutro = false }) {
+export default function TablaFiltrable({ filas, columnas, estados, buscar = 'Buscar por descripción, referencia o monto…', unidad = 'movimientos', vacio = 'No hay nada para mostrar.', sinFecha = false, neutro = false, acciones }) {
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(() => new Set()) // estados marcados
   const [desde, setDesde] = useState('')
@@ -115,6 +115,7 @@ export default function TablaFiltrable({ filas, columnas, estados, buscar = 'Bus
           <Suma s={sMarcado} neutro={neutro} etiqueta="Suma" />
           {filtradas.some((f) => !marcados.has(f.id)) && <button className="link" onClick={marcarFiltradas}>Señalar los {fmtN(filtradas.length)} de este filtro</button>}
           <span style={{ flex: 1 }} />
+          {acciones && acciones(marcados)}
           <button className="btn ghost sm" onClick={() => setMarcados(new Set())}>Quitar selección</button>
         </div>
       )}

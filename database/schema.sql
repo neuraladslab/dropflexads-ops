@@ -123,6 +123,8 @@ CREATE TABLE IF NOT EXISTS card_transactions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (owner_id, external_key)
 );
+-- Movimientos que la persona decidió no contar (p. ej. Dropi los re-fecha y quedarían duplicados). La sincronización nunca toca esta marca.
+ALTER TABLE card_transactions ADD COLUMN IF NOT EXISTS ignored BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_card_transactions_owner_date ON card_transactions (owner_id, tx_date);
 CREATE INDEX IF NOT EXISTS idx_card_transactions_pay_ref ON card_transactions (owner_id, upper(pay_ref)) WHERE pay_ref IS NOT NULL;
 

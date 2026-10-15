@@ -52,6 +52,7 @@ export function VistaTarjeta({ d }) {
         <Kpi l="Gastaste en Meta" v={cop(t.meta)} nota="solo lo que cruza por referencia de pago" />
         <Kpi l="Gastaste en otras cosas" v={cop(t.otros)} nota="no es de Meta" />
         <Kpi l="Rechazados por el banco" v={fmtN(t.rechazados)} nota="no movieron plata" />
+        {t.ignorados > 0 && <Kpi l="Ignorados por ti" v={fmtN(t.ignorados)} nota="no cuentan en tus gastos" />}
       </div>
       <TablaTarjeta lista={d.lista} />
     </>

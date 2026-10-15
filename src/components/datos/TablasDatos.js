@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import TablaFiltrable from './TablaFiltrable'
 import { cop, diaCorto, cpm, ctr, pct } from '@/lib/formato'
 
@@ -9,20 +11,46 @@ const opciones = (mapa) => Object.entries(mapa).map(([valor, [, etiqueta]]) => (
 const plano = (...p) => p.filter((x) => x != null && x !== '').join(' ') // texto para buscar (monto en dígitos sin puntos)
 
 /* ---------- Tarjeta ---------- */
-const CLASE = { meta: ['blue', 'De Meta · cruza con un cobro'], meta_monto: ['blue', 'De Meta · por monto y fecha'], otro: ['idle', 'Otro gasto'], repetido: ['bad', 'Posible cobro doble'], recarga: ['ok', 'Recarga'], rechazado: ['warn', 'Rechazado por el banco'] }
+const CLASE = { meta: ['blue', 'De Meta · cruza con un cobro'], meta_monto: ['blue', 'De Meta · por monto y fecha'], otro: ['idle', 'Otro gasto'], repetido: ['bad', 'Posible cobro doble'], recarga: ['ok', 'Recarga'], rechazado: ['warn', 'Rechazado por el banco'], ignorado: ['idle', 'Ignorado · no cuenta'] }
 
 export function TablaTarjeta({ lista }) {
-  // Un movimiento rechazado no movió plata: aparece, pero no suma.
-  const filas = lista.map((x) => ({ ...x, valor: x.clase === 'recarga' ? x.monto : x.clase === 'rechazado' ? 0 : -x.monto, estado: x.clase, texto: plano(x.descripcion, x.refPago, x.monto, CLASE[x.clase][1]) }))
+  const router = useRouter()
+  const [error, setError] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+  // Un movimiento rechazado o ignorado no suma: aparece, pero no cuenta.
+  const filas = lista.map((x) => ({ ...x, valor: x.clase === 'recarga' ? x.monto : x.clase === 'rechazado' || x.clase === 'ignorado' ? 0 : -x.monto, estado: x.clase, texto: plano(x.descripcion, x.refPago, x.monto, CLASE[x.clase][1]) }))
+  const cambiar = async (ids, ignored) => {
+    setOcupado(true); setError('')
+    try {
+      const res = await fetch('/api/tarjeta-movimientos', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'ignore', ids, ignored }) })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'No se pudo guardar el cambio.')
+      router.refresh()
+    } catch (e) { setError(e.message) } finally { setOcupado(false) }
+  }
+  const tachado = (f) => f.clase === 'rechazado' || f.clase === 'ignorado' ? { textDecoration: 'line-through', opacity: 0.6 } : undefined
   return (
-    <TablaFiltrable filas={filas} estados={opciones(CLASE)} unidad="movimientos" vacio="Aún no hay movimientos de la tarjeta."
-      columnas={[
-        { titulo: 'Fecha', izq: true, celda: (f) => diaCorto(f.fecha) },
-        { titulo: 'Descripción', txt: true, celda: (f) => f.descripcion || '—' },
-        { titulo: 'Referencia', txt: true, celda: (f) => f.refPago || '—' },
-        { titulo: 'Valor', celda: (f) => <span style={f.clase === 'rechazado' ? { textDecoration: 'line-through', opacity: 0.6 } : undefined}>{f.clase === 'recarga' ? '+' : '−'}{cop(f.monto)}</span> },
-        { titulo: 'Qué es', izq: true, celda: (f) => <Chip t={CLASE[f.clase][0]}>{CLASE[f.clase][1]}</Chip> },
-      ]} />
+    <>
+      {error && <p className="empty-note" role="alert" style={{ color: 'var(--coral-ink)', margin: '0 0 10px' }}>{error}</p>}
+      <TablaFiltrable filas={filas} estados={opciones(CLASE)} unidad="movimientos" vacio="Aún no hay movimientos de la tarjeta."
+        acciones={(sel) => {
+          const ids = filas.filter((f) => sel.has(f.id)), ign = ids.filter((f) => f.clase === 'ignorado'), act = ids.filter((f) => f.clase !== 'ignorado')
+          return (
+            <>
+              {act.length > 0 && <button className="btn ghost sm" disabled={ocupado} onClick={() => cambiar(act.map((f) => f.id), true)}>Ignorar {act.length} (no contar)</button>}
+              {ign.length > 0 && <button className="btn ghost sm" disabled={ocupado} onClick={() => cambiar(ign.map((f) => f.id), false)}>Volver a contar {ign.length}</button>}
+            </>
+          )
+        }}
+        columnas={[
+          { titulo: 'Fecha', izq: true, celda: (f) => diaCorto(f.fecha) },
+          { titulo: 'Descripción', txt: true, celda: (f) => f.descripcion || '—' },
+          { titulo: 'Referencia', txt: true, celda: (f) => f.refPago || '—' },
+          { titulo: 'Valor', celda: (f) => <span style={tachado(f)}>{f.clase === 'recarga' ? '+' : '−'}{cop(f.monto)}</span> },
+          { titulo: 'Qué es', izq: true, celda: (f) => <Chip t={CLASE[f.clase][0]}>{CLASE[f.clase][1]}</Chip> },
+          { titulo: 'Contabilidad', izq: true, celda: (f) => <button className="link" disabled={ocupado} onClick={() => cambiar([f.id], f.clase !== 'ignorado')}>{f.clase === 'ignorado' ? 'Volver a contar' : 'No contar'}</button> },
+        ]} />
+    </>
   )
 }
 
