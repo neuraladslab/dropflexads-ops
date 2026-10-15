@@ -37,10 +37,11 @@ export function classifyWallet(o) {
   const reverses = o.reverses_history_wallet_id != null ? String(o.reverses_history_wallet_id).slice(0, 40) : ''
   let kind
   if (reverses) kind = 'reversal'
+  else if (dir === 'out' && /FLETE INICIAL/i.test(description)) kind = 'return_fee' // Dropi lo manda con el código 1000 (pago de pedido), pero es el cobro de una devolución
   else if (kindByCode(code)) kind = kindByCode(code)
   else if (dir === 'in' && /GANANCIA EN LA ORDEN/i.test(description)) kind = 'profit'
   else if (/MANTENIMIENTO/i.test(description)) kind = 'card_fee'
-  else if (dir === 'out' && /DEVOLUCI|FLETE INICIAL/i.test(description)) kind = 'return_fee'
+  else if (dir === 'out' && /DEVOLUCI/i.test(description)) kind = 'return_fee'
   else if (o.withdrawal_request_id != null || /RETIRO/i.test(description)) kind = 'withdrawal'
   else if (dir === 'out' && /TARJETA|RECARGA/i.test(description)) kind = 'to_card'
   else kind = dir === 'in' ? 'other_in' : 'other_out'
