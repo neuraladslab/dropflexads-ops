@@ -33,14 +33,14 @@ export function classifyWallet(o) {
   const before = num(o.previous_amount)
   const code = o.identification_code != null ? String(o.identification_code).slice(0, 10) : ''
   const guide = String((o.order && o.order.shipping_guide) || (/GUIA:\s*\*?(\d{6,40})/i.exec(description) || [])[1] || '').replace(/\D/g, '').slice(0, 40)
-  const orderRef = String(o.order_id ?? (o.order && o.order.id) ?? '').replace(/\D/g, '').slice(0, 30)
+  const orderRef = String(o.order_id ?? (o.order && o.order.id) ?? (/FLETE INICIAL:?\s*\*?(\d{4,30})/i.exec(description) || [])[1] ?? '').replace(/\D/g, '').slice(0, 30) // «…FLETE INICIAL: 92490675»: el número es el pedido
   const reverses = o.reverses_history_wallet_id != null ? String(o.reverses_history_wallet_id).slice(0, 40) : ''
   let kind
   if (reverses) kind = 'reversal'
   else if (kindByCode(code)) kind = kindByCode(code)
   else if (dir === 'in' && /GANANCIA EN LA ORDEN/i.test(description)) kind = 'profit'
   else if (/MANTENIMIENTO/i.test(description)) kind = 'card_fee'
-  else if (dir === 'out' && /DEVOLUCI/i.test(description)) kind = 'return_fee'
+  else if (dir === 'out' && /DEVOLUCI|FLETE INICIAL/i.test(description)) kind = 'return_fee'
   else if (o.withdrawal_request_id != null || /RETIRO/i.test(description)) kind = 'withdrawal'
   else if (dir === 'out' && /TARJETA|RECARGA/i.test(description)) kind = 'to_card'
   else kind = dir === 'in' ? 'other_in' : 'other_out'

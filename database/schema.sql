@@ -185,6 +185,8 @@ CREATE TABLE IF NOT EXISTS wallet_movements (
 );
 CREATE INDEX IF NOT EXISTS idx_wallet_movements_owner_date ON wallet_movements (owner_id, tx_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wallet_movements_order ON wallet_movements (owner_id, order_ref);
+-- «SALIDA POR COBRO DE FLETE INICIAL» es el cobro de una devolución: antes quedaba como «otro descuento».
+UPDATE wallet_movements SET kind = 'return_fee', order_ref = COALESCE(NULLIF(order_ref, ''), substring(description from '(?i)FLETE INICIAL:?\s*\*?(\d{4,30})')) WHERE kind = 'other_out' AND direction = 'out' AND description ~* 'FLETE INICIAL';
 
 -- Pedidos de Dropi (TODOS los estados; el estado real decide la contabilidad). NO guarda datos del cliente (nombre, teléfono, dirección) ni facturas.
 -- product_ids = IDs de producto de Dropi del pedido: con ellos se atribuye el pedido a una campaña (por producto).
