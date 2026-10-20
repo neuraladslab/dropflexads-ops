@@ -3,7 +3,8 @@ import Ayuda from '@/components/Ayuda'
 
 // Piezas visuales de Cortes. Colores validados (separación para daltonismo) en este orden fijo: azul · ámbar · violeta · verde. El coral solo para lo que está mal (devuelto).
 export const COLOR = { azul: 'var(--blue)', ambar: 'var(--gold)', violeta: '#8B5CF6', jade: 'var(--jade)', coral: 'var(--coral)' }
-const pct = (v, t) => (t > 0 ? Math.round((v / t) * 100) : 0)
+/** Porcentaje con una decimal y coma («58,7 %»); lo muy pequeño se dice como tal en vez de mostrar «0,0 %». */
+const pct = (v, t) => { const p = t > 0 ? (v / t) * 100 : 0; return p > 0 && p < 0.1 ? '<0,1 %' : p.toFixed(1).replace('.', ',') + ' %' }
 
 /**
  * Barra apilada: una sola barra dividida en tramos; la leyenda siempre dice cuánto vale cada uno (el color nunca va solo).
@@ -20,11 +21,11 @@ export function BarraApilada({ titulo, total, segmentos, marca, unidad = 'cop' }
       {(titulo || total != null) && <div className="vz-t"><span>{titulo}</span>{total != null && <b>{f(total)}</b>}</div>}
       <div className="vz-wrap">
         <div className="vz-bar" role="img" aria-label={`${titulo || 'Distribución'}: ${alt}`}>
-          {segs.map((s) => <div key={s.etiqueta} className="vz-seg" title={`${s.etiqueta}: ${f(s.valor)} (${pct(s.valor, suma)} %)`} style={{ flexGrow: s.valor, background: s.color }} />)}
+          {segs.map((s) => <div key={s.etiqueta} className="vz-seg" title={`${s.etiqueta}: ${f(s.valor)} (${pct(s.valor, suma)})`} style={{ flexGrow: s.valor, background: s.color }} />)}
         </div>
         {marca && marca.valor > 0 && marca.valor < suma && <div className="vz-marca" style={{ left: `${(marca.valor / suma) * 100}%` }}><span>{marca.etiqueta}</span></div>}
       </div>
-      <ul className="vz-leg">{segs.map((s) => <li key={s.etiqueta}><i style={{ background: s.color }} />{s.etiqueta} <b>{f(s.valor)}</b></li>)}</ul>
+      <ul className="vz-leg">{segs.map((s) => <li key={s.etiqueta}><i style={{ background: s.color }} />{s.etiqueta} <b>{f(s.valor)}</b> <span style={{ fontSize: 12.5 }}>· {pct(s.valor, suma)}</span></li>)}</ul>
     </div>
   )
 }
