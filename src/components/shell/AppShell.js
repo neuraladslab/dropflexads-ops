@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SECCIONES } from './nav'
 import { Icono } from './Icono'
 import Paleta from './Paleta'
+import { AsistenteFlotante } from '@/components/ia/AsistenteFlotante'
 import EstadoDatos from './EstadoDatos'
 
 const activo = (pathname, href) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/'))
@@ -113,6 +114,7 @@ export default function AppShell({ email, children }) {
         </main>
       </div>
       <Paleta abierta={paleta} onCerrar={() => setPaleta(false)} />
+      <AsistenteFlotante />
     </>
   )
 }

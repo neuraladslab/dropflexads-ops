@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test src/domain/domain.test.ts src/lib/dropi/parse/parse.test.mjs src/lib/meta/parse.test.mjs",
+    "test": "node --test src/domain/domain.test.ts src/lib/dropi/parse/parse.test.mjs src/lib/meta/parse.test.mjs src/lib/ia/ia.test.mjs",
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "auth:init": "node scripts/auth-init.mjs",
     "auth:secret": "node scripts/auth-init.mjs --print",
@@ -25,6 +25,7 @@
     "verificar:cifras": "node --conditions=react-server --import ./scripts/_alias-register.mjs --env-file=.env.local scripts/verificar-cifras.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "jose": "^6.2.12",
     "next": "16.4.0",
     "postgres": "^3.4.0",

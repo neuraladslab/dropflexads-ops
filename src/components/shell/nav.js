@@ -29,6 +29,7 @@ export const SECCIONES = [
       { slug: 'herramientas', titulo: 'Herramientas de operación' },
       { slug: 'corte', titulo: 'Corte del mes' },
       { slug: 'reparto', titulo: 'Reparto' },
+      { slug: 'ia', titulo: 'Inteligencia artificial' },
     ] },
   ] },
 ]

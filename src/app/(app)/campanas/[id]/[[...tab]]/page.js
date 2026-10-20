@@ -1,13 +1,15 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Pendiente } from '@/components/shell/Pagina'
-import { VistaPedidos, VistaGastoCampana, VistaEscalar, VistaInformeDiario } from '@/components/datos/Vistas'
+import { VistaPedidos, VistaGastoCampana, VistaInformeDiario } from '@/components/datos/Vistas'
+import { VistaEscalado } from '@/components/datos/VistaEscalado'
 import PanelMeta from '@/components/PanelMeta'
 import ResultadoCampana from '@/components/ResultadoCampana'
 import TarjetaCombos from '@/components/datos/TarjetaCombos'
 import SelectorPeriodo from '@/components/datos/SelectorPeriodo'
 import { diaCorto } from '@/lib/formato'
-import { datosCampana, periodoElegido } from '@/lib/datos'
+import { datosCampana, datosEscalado, periodoElegido } from '@/lib/datos'
+import { estadoIA } from '@/lib/ia/asistente'
 import { usuarioActual } from '@/lib/sesion'
 
 export const metadata = { title: 'Campaña · DropFlexAds Ops' }
@@ -25,7 +27,7 @@ export default async function PaginaCampana({ params, searchParams }) {
   const uid = await usuarioActual()
   const { per, cortes, hoy, inicio } = await periodoElegido(uid, uno(sp.p) ?? 'todo')
   const rango = per.tipo === 'todo' ? null : { desde: per.desde, hasta: per.hasta }
-  const c = await datosCampana(uid, id, new Map(), rango)
+  const m = new Map(), c = await datosCampana(uid, id, m, rango)
   if (!c || !TABS.some((t) => t.slug === slug) || (!c.conTabs && slug)) notFound()
   const base = `/campanas/${id}`, qs = sp.p ? `?p=${encodeURIComponent(uno(sp.p))}` : '' // el periodo elegido se conserva al cambiar de pestaña
   const vacio = <div className="tint blue" style={{ marginBottom: 16 }}><b style={{ color: 'var(--blue)' }}>Esta campaña todavía no tiene pedidos</b><div style={{ fontSize: 14.5, marginTop: 2 }}>Los pedidos aparecen cuando Dropi trae pedidos de {c.productos.length ? 'sus productos' : 'este grupo'}. Sincroniza en Mis cuentas → Dropi.</div></div>
@@ -41,8 +43,8 @@ export default async function PaginaCampana({ params, searchParams }) {
           {c.clave === 'todos' && <p className="muted" style={{ marginTop: 6 }}>Todos tus pedidos, de todas las campañas y los que no tienen campaña.</p>}
         </div>
       </div>
-      <SelectorPeriodo cortes={cortes} param={per.param} tipo={per.tipo} desde={per.desde} hasta={per.hasta} hoy={hoy} inicio={inicio} ruta={slug ? `${base}/${slug}` : base} />
-      {rango && <p className="muted" style={{ fontSize: 13.5, margin: '-6px 0 14px' }}>Mostrando los pedidos creados del {diaCorto(per.desde)} al {diaCorto(per.hasta)} y el gasto de Meta de esos días. «Cuándo escalar» siempre mira los últimos días.</p>}
+      {slug !== 'escalar' && <SelectorPeriodo cortes={cortes} param={per.param} tipo={per.tipo} desde={per.desde} hasta={per.hasta} hoy={hoy} inicio={inicio} ruta={slug ? `${base}/${slug}` : base} />}
+      {slug !== 'escalar' && rango && <p className="muted" style={{ fontSize: 13.5, margin: '-6px 0 14px' }}>Mostrando los pedidos creados del {diaCorto(per.desde)} al {diaCorto(per.hasta)} y el gasto de Meta de esos días. «Cuándo escalar» siempre mira los últimos días.</p>}
       {(c.r || c.gasto) && <div className="card" style={{ marginBottom: 16 }}><ResultadoCampana r={c.r} gasto={c.gasto} /></div>}
       <TarjetaCombos c={c.combos} />
       {c.conTabs && (
@@ -55,7 +57,7 @@ export default async function PaginaCampana({ params, searchParams }) {
       {slug === 'informe' && <VistaInformeDiario filas={c.informe} nombre={c.nombre} />}
       {slug === 'meta' && <><PanelMeta /><VistaGastoCampana m={c.meta} inicio={c.inicio} /></>}
       {slug === 'creativos' && <Pendiente titulo={`Creativos de «${c.nombre}»`} queMuestra="Los anuncios de esta campaña con su nombre estándar, el enlace al archivo y su resultado (alcance, CPA y gasto de cada uno)." fuente="Meta Ads: cada anuncio se une a su campaña." fase="Después de conectar Meta" />}
-      {slug === 'escalar' && <VistaEscalar e={c.escalar} nombre={c.nombre} vinculada={c.meta.vinculada} />}
+      {slug === 'escalar' && <VistaEscalado d={await datosEscalado(uid, id, { presupuesto: Number(uno(sp.s)) || null }, m)} s={Number(uno(sp.s)) || null} nombre={c.nombre} tieneIA={(await estadoIA(uid)).tieneClave} />}
     </>
   )
 }
