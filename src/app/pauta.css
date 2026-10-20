@@ -436,13 +436,23 @@ details.md-fold>summary .md-sm{font-weight:400;font-size:13.5px;color:var(--mute
 .rp-paper .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .rp-paper tr{break-inside:avoid}.rp-paper thead{display:table-header-group}
 @media (max-width:700px){.rp-paper{margin:12px 8px 40px;padding:22px 16px;overflow-x:auto}}
+.rp-paper .vz-t{font-size:13px}.rp-paper .vz-leg{font-size:12.5px}.rp-paper .vz-leg b{font-family:inherit}
+.rp-paper .sub{color:#475569}.rp-paper .rp-sec-h{display:flex;gap:10px;align-items:baseline}
+/* Impresión / PDF: se imprime solo el contenido de la pantalla (sin menú ni barra superior). Lo que lleve .no-print no sale. */
 @media print{
-  @page{margin:14mm}
+  @page{margin:12mm}
   html,body{background:#fff!important;height:auto!important;overflow:visible!important}
-  body>*:not(#report-root){display:none!important}
-  #report-root{position:static!important;overflow:visible!important;background:#fff!important;display:block!important;inset:auto!important}
+  .skip,.side,.top,.no-print,.pagehead,.seg{display:none!important}
+  .app{display:block!important;min-height:0!important}
+  .main{padding:0!important}
+  .view{padding-top:0!important;animation:none!important}
+  .card,.tint{box-shadow:none!important;break-inside:avoid}
   .rp-bar{display:none!important}
   .rp-paper{box-shadow:none!important;margin:0!important;padding:0!important;max-width:none!important}
+  .informe h2{break-after:avoid}
+  .informe .tbl-card{break-inside:avoid}
+  .scroll-x{overflow:visible!important}
+  details:not([open])>*:not(summary){display:none}
 }
 
 .md-explain{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:14px 0 0;padding:14px 18px;border:1px solid var(--line);border-radius:14px;background:var(--card,#fff)}
@@ -706,3 +716,31 @@ a.ni{text-decoration:none}
 .gr-mini>div:first-child{border-right:1px solid var(--line);padding-left:0}
 @media (max-width:760px){.gr-mini{grid-template-columns:1fr}.gr-mini>div:first-child{border-right:0;border-bottom:1px solid var(--line);padding:0 0 16px}.gr-mini>div{padding:16px 0 0}}
 .aprender-t{scroll-margin-top:90px}
+
+/* ---------- Barras apiladas y tarjetas de cifra (Cortes): 2px entre segmentos, extremos redondeados de 4px, leyenda con el valor de cada tramo ---------- */
+.vz-t{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin:0 0 8px;font-weight:600;font-size:14.5px}
+.vz-t b{font-family:var(--mono);font-weight:700}
+.vz-wrap{position:relative;padding-top:2px}
+.vz-bar{display:flex;gap:2px;height:20px}
+.vz-seg{min-width:3px;flex-basis:0}
+.vz-seg:first-child{border-radius:4px 0 0 4px}.vz-seg:last-child{border-radius:0 4px 4px 0}.vz-seg:only-child{border-radius:4px}
+.vz-marca{position:absolute;top:-4px;bottom:-4px;width:0;border-left:2px dashed var(--ink)}
+.vz-marca span{position:absolute;top:-20px;left:4px;font-size:12px;font-weight:600;white-space:nowrap;color:var(--ink)}
+.vz-leg{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13.5px}
+.vz-leg li{display:flex;align-items:center;gap:7px;color:var(--muted)}
+.vz-leg i{width:10px;height:10px;border-radius:3px;flex:none}
+.vz-leg b{font-family:var(--mono);font-weight:600;color:var(--ink)}
+.vz-hero{font-family:var(--mono);font-size:48px;font-weight:700;letter-spacing:-.025em;line-height:1.05}
+.vz-estado{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;padding:4px 12px 4px 6px;border-radius:999px}
+.vz-estado i{width:20px;height:20px;border-radius:999px;display:grid;place-items:center;color:#fff;font-style:normal;font-size:12px;font-weight:800}
+.vz-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.vz-tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.vz-tile .l{font-size:13px;color:var(--muted)}
+.vz-tile .v{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:2px}
+.vz-tile .n{font-size:12.5px;color:var(--muted);margin-top:2px}
+.vz-prog{height:8px;border-radius:999px;background:var(--line);overflow:hidden}
+.vz-prog>div{height:100%;background:var(--blue);border-radius:999px}
+details.vz-det>summary{cursor:pointer;font-weight:600;font-size:14.5px;color:var(--blue);padding:6px 0;list-style:none}
+details.vz-det>summary::-webkit-details-marker{display:none}
+details.vz-det>summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+details.vz-det[open]>summary::before{content:"▾ "}

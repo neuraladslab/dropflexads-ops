@@ -1,5 +1,5 @@
 import sql from '@/lib/db'
-import { guard, ok, bad, readBody, isId, text } from '@/lib/http'
+import { guard, ok, bad, readBody, isId, text, num } from '@/lib/http'
 import { logActivity } from '@/lib/activity'
 import { limpiarProductos } from '@/lib/campanas'
 
@@ -13,12 +13,15 @@ export const PATCH = guard(async (request, ctx, session) => {
   const nombre = b.nombre !== undefined ? text(b.nombre, 120) : undefined
   const productIds = b.productIds !== undefined ? limpiarProductos(b.productIds) : undefined
   const activa = typeof b.activa === 'boolean' ? b.activa : undefined
+  const dev = b.devolucionPct !== undefined ? num(b.devolucionPct, { min: 0, max: 100 }) : undefined
+  if (b.devolucionPct !== undefined && dev == null) return bad('El % de devolución debe estar entre 0 y 100.')
   if (b.nombre !== undefined && !nombre) return bad('Escribe el nombre de la campaña.')
   if (b.productIds !== undefined && (!productIds || !productIds.length)) return bad('Elige al menos un producto.')
-  if (nombre === undefined && productIds === undefined && activa === undefined) return bad('No hay nada que cambiar.')
+  if (nombre === undefined && productIds === undefined && activa === undefined && dev === undefined) return bad('No hay nada que cambiar.')
   const r = await sql`UPDATE campaigns SET name = COALESCE(${nombre ?? null}, name), product_ids = COALESCE(${productIds ?? null}, product_ids), active = COALESCE(${activa ?? null}, active)
                       WHERE id = ${Number(id)} AND owner_id = ${session.userId} RETURNING name`
   if (!r.length) return bad('No encontré esa campaña.', 404)
+  if (dev !== undefined) await sql`UPDATE campaigns SET return_pct = ${dev} WHERE id = ${Number(id)} AND owner_id = ${session.userId}` // la columna llega con la migración
   await logActivity(session.userId, `Cambiaste la campaña «${r[0].name}»`)
   return ok({ ok: true })
 })

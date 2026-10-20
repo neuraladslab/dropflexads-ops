@@ -1,18 +1,15 @@
 // Mapa de navegación (según el diagrama de DropFlexAds Ops). Cada sección tiene pestañas; la primera es la página por defecto.
 export const SECCIONES = [
   { id: 'hoy', etiqueta: 'Hoy', items: [
-    { href: '/', icono: 'home', titulo: 'Dashboard', desc: '¿Cuándo recupero mi inversión?' },
+    { href: '/', icono: 'home', titulo: 'Inicio', desc: 'Cuánto puedes retirar, cómo vas en el corte y cuándo recuperas tu inversión' },
   ] },
   { id: 'campanas', etiqueta: 'Campañas', items: [
     { href: '/campanas', icono: 'chart', titulo: 'Campañas', desc: 'Cada campaña con sus pedidos, creativos y cuándo escalar' },
   ] },
   { id: 'dinero', etiqueta: 'Dinero', items: [
-    { href: '/contabilidad', icono: 'coin', titulo: 'Contabilidad', desc: 'Lo que entra y lo que sale, con datos reales', tabs: [
-      { slug: '', titulo: 'Ganancia por día' },
-      { slug: 'costo-por-venta', titulo: 'Costo por venta' },
-      { slug: 'a-donde-va-mi-plata', titulo: 'A dónde va mi plata' },
-      { slug: 'cuando-recupero', titulo: 'Cuándo recupero' },
-      { slug: 'caja', titulo: 'Caja' },
+    { href: '/contabilidad', icono: 'coin', titulo: 'Contabilidad', desc: 'Lo que entra, lo que sale y cuánto puedes retirar, por corte', tabs: [
+      { slug: '', titulo: 'Cortes' },
+      { slug: 'recuperacion', titulo: 'Recuperación' },
     ] },
     { href: '/cuentas', icono: 'wallet', titulo: 'Mis cuentas', desc: 'Dropi y Meta, conectados y al día', tabs: [
       { slug: '', titulo: 'Dropi · Billetera' },
@@ -27,9 +24,11 @@ export const SECCIONES = [
     { href: '/aprender', icono: 'book', titulo: 'Aprender', desc: 'Qué significa cada cifra, con ejemplos y cómo usarla para decidir' },
   ] },
   { id: 'config', etiqueta: 'Configuración', items: [
-    { href: '/configuracion', icono: 'box', titulo: 'Configuración', desc: 'Cuenta de Meta y herramientas mensuales', tabs: [
+    { href: '/configuracion', icono: 'box', titulo: 'Configuración', desc: 'Cuenta de Meta, herramientas mensuales, corte y reparto', tabs: [
       { slug: '', titulo: 'Cuenta de Meta' },
       { slug: 'herramientas', titulo: 'Herramientas de operación' },
+      { slug: 'corte', titulo: 'Corte del mes' },
+      { slug: 'reparto', titulo: 'Reparto' },
     ] },
   ] },
 ]

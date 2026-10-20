@@ -4,7 +4,7 @@ import { VistaDashboard } from '@/components/datos/Vistas'
 import { datosDashboard } from '@/lib/datos'
 import { usuarioActual } from '@/lib/sesion'
 
-export const metadata = { title: 'Dashboard · DropFlexAds Ops' }
+export const metadata = { title: 'Inicio · DropFlexAds Ops' }
 
 export default async function Dashboard() {
   return (

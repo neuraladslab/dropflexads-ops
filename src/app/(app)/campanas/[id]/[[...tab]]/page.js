@@ -5,7 +5,9 @@ import { VistaPedidos, VistaGastoCampana, VistaEscalar, VistaInformeDiario } fro
 import PanelMeta from '@/components/PanelMeta'
 import ResultadoCampana from '@/components/ResultadoCampana'
 import TarjetaCombos from '@/components/datos/TarjetaCombos'
-import { datosCampana } from '@/lib/datos'
+import SelectorPeriodo from '@/components/datos/SelectorPeriodo'
+import { diaCorto } from '@/lib/formato'
+import { datosCampana, periodoElegido } from '@/lib/datos'
 import { usuarioActual } from '@/lib/sesion'
 
 export const metadata = { title: 'Campaña · DropFlexAds Ops' }
@@ -13,13 +15,19 @@ export const metadata = { title: 'Campaña · DropFlexAds Ops' }
 // Cada campaña tiene sus propias secciones (como en el diagrama): Pedidos, Gasto en Meta, Creativos y Cuándo escalar.
 const TABS = [{ slug: '', titulo: 'Pedidos' }, { slug: 'informe', titulo: 'Pedidos por día' }, { slug: 'meta', titulo: 'Gasto en Meta' }, { slug: 'creativos', titulo: 'Creativos' }, { slug: 'escalar', titulo: 'Cuándo escalar' }]
 
-export default async function PaginaCampana({ params }) {
+const uno = (v) => (Array.isArray(v) ? v[0] : v)
+
+export default async function PaginaCampana({ params, searchParams }) {
   const { id, tab } = await params
+  const sp = await searchParams
   if (tab && tab.length > 1) notFound()
   const slug = (tab && tab[0]) || ''
-  const c = await datosCampana(await usuarioActual(), id)
+  const uid = await usuarioActual()
+  const { per, cortes, hoy, inicio } = await periodoElegido(uid, uno(sp.p) ?? 'todo')
+  const rango = per.tipo === 'todo' ? null : { desde: per.desde, hasta: per.hasta }
+  const c = await datosCampana(uid, id, new Map(), rango)
   if (!c || !TABS.some((t) => t.slug === slug) || (!c.conTabs && slug)) notFound()
-  const base = `/campanas/${id}`
+  const base = `/campanas/${id}`, qs = sp.p ? `?p=${encodeURIComponent(uno(sp.p))}` : '' // el periodo elegido se conserva al cambiar de pestaña
   const vacio = <div className="tint blue" style={{ marginBottom: 16 }}><b style={{ color: 'var(--blue)' }}>Esta campaña todavía no tiene pedidos</b><div style={{ fontSize: 14.5, marginTop: 2 }}>Los pedidos aparecen cuando Dropi trae pedidos de {c.productos.length ? 'sus productos' : 'este grupo'}. Sincroniza en Mis cuentas → Dropi.</div></div>
 
   return (
@@ -33,11 +41,13 @@ export default async function PaginaCampana({ params }) {
           {c.clave === 'todos' && <p className="muted" style={{ marginTop: 6 }}>Todos tus pedidos, de todas las campañas y los que no tienen campaña.</p>}
         </div>
       </div>
+      <SelectorPeriodo cortes={cortes} param={per.param} tipo={per.tipo} desde={per.desde} hasta={per.hasta} hoy={hoy} inicio={inicio} ruta={slug ? `${base}/${slug}` : base} />
+      {rango && <p className="muted" style={{ fontSize: 13.5, margin: '-6px 0 14px' }}>Mostrando los pedidos creados del {diaCorto(per.desde)} al {diaCorto(per.hasta)} y el gasto de Meta de esos días. «Cuándo escalar» siempre mira los últimos días.</p>}
       {(c.r || c.gasto) && <div className="card" style={{ marginBottom: 16 }}><ResultadoCampana r={c.r} gasto={c.gasto} /></div>}
       <TarjetaCombos c={c.combos} />
       {c.conTabs && (
         <div className="seg" role="tablist" style={{ marginBottom: 20, flexWrap: 'wrap' }}>
-          {TABS.map((t) => <Link key={t.slug} role="tab" aria-selected={t.slug === slug} href={t.slug ? `${base}/${t.slug}` : base} className={'segl' + (t.slug === slug ? ' on' : '')}>{t.titulo}</Link>)}
+          {TABS.map((t) => <Link key={t.slug} role="tab" aria-selected={t.slug === slug} href={(t.slug ? `${base}/${t.slug}` : base) + qs} className={'segl' + (t.slug === slug ? ' on' : '')}>{t.titulo}</Link>)}
         </div>
       )}
       {slug === '' && c.clave === 'todos' && <><VistaInformeDiario filas={c.informe} /><div style={{ height: 20 }} /></>}

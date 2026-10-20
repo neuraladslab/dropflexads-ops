@@ -1,14 +1,15 @@
 import { crearPagina } from '@/components/shell/crearPagina'
-import { VistaGananciaDia, VistaCaja, VistaCostoPorVenta, VistaDondeVaMiPlata, VistaCuandoRecupero } from '@/components/datos/Vistas'
-import { datosGananciaPorDia, datosCaja, datosRecuperacion } from '@/lib/datos'
+import { VistaDinero } from '@/components/datos/VistaDinero'
+import { VistaCuandoRecupero } from '@/components/datos/Vistas'
+import { datosPeriodo, datosRecuperacion } from '@/lib/datos'
 import { usuarioActual } from '@/lib/sesion'
 
 export const metadata = { title: 'Contabilidad · DropFlexAds Ops' }
-const fuentes = 'Billetera y tarjeta de Dropi, pedidos de Dropi y gasto de Meta Ads. Total de campañas o por campaña.'
+const uno = (v) => (Array.isArray(v) ? v[0] : v)
+// Las 6 pestañas de antes pasaron a 2: «Cortes» reúne ganancia por día, costo por venta, a dónde va la plata y caja (por periodo); «Recuperación» queda aparte (mira todo el tiempo).
 export default crearPagina('/contabilidad', {
-  '': async () => <VistaGananciaDia d={await datosGananciaPorDia(await usuarioActual())} />,
-  'costo-por-venta': async () => <VistaCostoPorVenta d={await datosGananciaPorDia(await usuarioActual())} />,
-  'a-donde-va-mi-plata': async () => <VistaDondeVaMiPlata d={await datosGananciaPorDia(await usuarioActual())} />,
-  'cuando-recupero': async () => <VistaCuandoRecupero d={await datosRecuperacion(await usuarioActual())} />,
-  caja: async () => <VistaCaja d={await datosCaja(await usuarioActual())} />,
+  '': async (sp) => <VistaDinero d={await datosPeriodo(await usuarioActual(), uno(sp.p))} />,
+  recuperacion: async () => <VistaCuandoRecupero d={await datosRecuperacion(await usuarioActual())} />,
+}, {
+  'costo-por-venta': '/contabilidad', 'a-donde-va-mi-plata': '/contabilidad', caja: '/contabilidad', cortes: '/contabilidad', 'cuando-recupero': '/contabilidad/recuperacion',
 })

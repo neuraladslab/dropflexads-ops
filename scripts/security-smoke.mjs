@@ -24,7 +24,7 @@ try { await req('GET', '/login') } catch { console.error('No se pudo conectar. �
 console.log('[1] Todas las rutas de la API exigen sesión')
 const routes = []
 const walk = (dir, url) => { for (const e of readdirSync(dir)) { const p = join(dir, e); if (statSync(p).isDirectory()) walk(p, url + '/' + e.replace(/\[id\]/, '1')); else if (e === 'route.js') routes.push({ url, file: p }) } }
-walk('app/api', '/api')
+walk('src/app/api', '/api')
 let open = []
 for (const { url, file } of routes) for (const m of [...readFileSync(file, 'utf8').matchAll(/export const (GET|POST|PUT|PATCH|DELETE)\b/g)].map((x) => x[1])) {
   if (url === '/api/auth/login' || url === '/api/auth/login/2fa' || url === '/api/auth/logout') continue // públicas por diseño (el segundo paso exige un ticket firmado)
@@ -47,7 +47,7 @@ if (secret && secret.length >= 32) {
   const key = new TextEncoder().encode(secret), now = Math.floor(Date.now() / 1000), b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
   const jwt = (over = {}, k = key, alg = 'HS256') => new SignJWT({}).setProtectedHeader({ alg, typ: 'JWT' }).setSubject('1').setJti(over.jti || '11111111-2222-3333-4444-555555555555').setIssuer(over.iss || 'dropflexads').setAudience(over.aud || 'dropflexads-web').setIssuedAt(over.iat || now).setExpirationTime(over.exp || now + 3600).sign(k)
   const name = process.env.NODE_ENV === 'production' ? '__Host-dfa_session' : 'dfa_session'
-  const st = async (t) => (await req('GET', '/api/state', { cookie: `${name}=${t}` })).status
+  const st = async (t) => (await req('GET', '/api/corte', { cookie: `${name}=${t}` })).status
   check('alg=none', (await st(`${b64({ alg: 'none', typ: 'JWT' })}.${b64({ sub: '1', exp: now + 3600 })}.`)) === 401)
   check('firmado con otro secreto', (await st(await jwt({}, new TextEncoder().encode('x'.repeat(40))))) === 401)
   check('token vencido', (await st(await jwt({ iat: now - 7200, exp: now - 3600 }))) === 401)
@@ -69,7 +69,7 @@ if (process.env.DFA_EMAIL && process.env.DFA_PASSWORD) {
     check('Content-Type text/plain → 415', (await act({ Origin: BASE, 'Content-Type': 'text/plain' })) === 415)
     check('cuerpo de 12 MB → 413', (await fetch(BASE + '/api/activity', { method: 'POST', headers: { Cookie: cookie, Origin: BASE, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'x'.repeat(12 * 1024 * 1024) }) })).status === 413)
     await req('POST', '/api/auth/logout', { cookie })
-    check('el token robado deja de servir tras cerrar sesión', (await req('GET', '/api/state', { cookie })).status === 401)
+    check('el token robado deja de servir tras cerrar sesión', (await req('GET', '/api/corte', { cookie })).status === 401)
   }
 }
 console.log(`\n${pass} correctas, ${fail} fallas`)

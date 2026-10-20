@@ -281,3 +281,22 @@ ALTER TABLE meta_charges ADD COLUMN IF NOT EXISTS source VARCHAR(10) NOT NULL DE
 
 -- Identificador de la transacción tal como sale en el extracto de Meta (p. ej. 28990819463938228-28947602274926610); es opcional y evita duplicar al importar.
 ALTER TABLE meta_charges ADD COLUMN IF NOT EXISTS reference VARCHAR(80);
+
+-- ============================================================
+-- Cortes del mes: devolución esperada por campaña y cierres sellados.
+-- % de devolución que se espera de los pedidos de la campaña (por defecto 15). Sirve para estimar la ganancia de los pedidos en curso y el costo de las devoluciones.
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS return_pct NUMERIC(5,2) NOT NULL DEFAULT 15;
+
+-- Cierre sellado de un corte: foto de las cifras al cerrarlo. NUNCA se modifica ni se borra: volver a cerrar crea una versión nueva. `period_end` = último día del corte.
+CREATE TABLE IF NOT EXISTS cut_closures (
+  id SERIAL PRIMARY KEY,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+  version INTEGER NOT NULL,
+  snapshot JSONB NOT NULL,
+  note VARCHAR(300),
+  closed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (owner_id, period_end, version)
+);
+CREATE INDEX IF NOT EXISTS idx_cut_closures_owner ON cut_closures (owner_id, period_end DESC, version DESC);

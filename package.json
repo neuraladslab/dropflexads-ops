@@ -21,7 +21,8 @@
     "security:smoke": "node --env-file=.env.local scripts/security-smoke.mjs",
     "captura": "node scripts/captura.mjs",
     "lint:undef": "eslint --rule '{\"no-undef\":\"error\"}' src/lib src/app/api scripts",
-    "verificar": "tsc --noEmit && npm run lint:undef && npm test"
+    "verificar": "tsc --noEmit && npm run lint:undef && npm test",
+    "verificar:cifras": "node --conditions=react-server --import ./scripts/_alias-register.mjs --env-file=.env.local scripts/verificar-cifras.mjs"
   },
   "dependencies": {
     "jose": "^6.2.12",

@@ -396,3 +396,184 @@ test("escalado: reglas de la calculadora con entrega prudente", () => {
   const reciente = evaluarEscalado({ dias: [...dias(30000, 5).slice(0, 5), { dia: "2026-10-06", gasto: 60000, ventas: 9 }, { dia: "2026-10-07", gasto: 60000, ventas: 9 }], margen: 50000 });
   assert.equal(reciente.veredicto, "vigilar"); assert.equal(reciente.checks?.find((c) => c.clave === "espera")?.ok, false);
 });
+
+import { periodoDe, listarPeriodos, resumenPorPeriodo, flujoPorPeriodo, diaCorteValido, diasTranscurridos } from "./periodos.ts";
+test("periodos con corte el 12: el 12 cierra el periodo y el 13 abre el siguiente", () => {
+  const ini = "2026-09-26";
+  assert.deepEqual(periodoDe("2026-10-12", 12, ini, "2026-10-19"), { id: "2026-10-12", desde: "2026-09-26", hasta: "2026-10-12", abierto: false });
+  assert.deepEqual(periodoDe("2026-10-13", 12, ini, "2026-10-19"), { id: "2026-11-12", desde: "2026-10-13", hasta: "2026-11-12", abierto: true });
+  assert.equal(periodoDe("2026-12-20", 12, ini, "2026-12-20").hasta, "2027-01-12"); // cruza el año
+  assert.equal(periodoDe("2027-03-01", 12, "2026-01-01", "2027-03-01").desde, "2027-02-13");
+});
+test("listarPeriodos: del inicio de la operación al periodo de hoy, sin huecos", () => {
+  const l = listarPeriodos("2026-09-26", "2026-10-19", 12);
+  assert.deepEqual(l.map((p) => [p.desde, p.hasta, p.abierto]), [["2026-09-26", "2026-10-12", false], ["2026-10-13", "2026-11-12", true]]);
+  assert.equal(listarPeriodos("2026-09-26", "2026-10-12", 12).length, 1); // el día del corte aún es del periodo
+  assert.equal(listarPeriodos("2026-09-26", "2027-01-05", 12).length, 4);
+  assert.equal(listarPeriodos("2026-09-26", "2026-09-20", 12).length, 1); // hoy antes del inicio: no revienta
+  assert.equal(diaCorteValido(12), true); assert.equal(diaCorteValido(29), false); assert.equal(diaCorteValido(0), false); assert.equal(diaCorteValido("12"), false);
+});
+test("resumen por periodo: cada día cae en un solo periodo y las herramientas van por día calendario", () => {
+  const d = (dia: string, ganancia: number, meta: number) => ({ ...diaVacio(dia), ganancia, meta, entregas: 1 });
+  const dias = [d("2026-10-12", 100000, 40000), d("2026-10-13", 80000, 20000), d("2026-10-15", 50000, 0)];
+  const ps = listarPeriodos("2026-09-26", "2026-10-19", 12);
+  const [a, b] = resumenPorPeriodo(dias, ps, 1000, "2026-10-19");
+  assert.equal(a.total.ganancia, 100000); assert.equal(a.diasCalendario, 17); assert.equal(a.herramientas, 17000); assert.equal(a.neto, 100000 - 40000 - 17000);
+  assert.equal(b.total.ganancia, 130000); assert.equal(b.diasCalendario, 7); assert.equal(b.dias.length, 2); // abierto: cuenta hasta hoy
+  assert.equal(a.total.ganancia + b.total.ganancia, 230000); // nada se pierde al cortar
+  assert.equal(diasTranscurridos(ps[1], "2026-10-13"), 1);
+});
+test("flujo de la billetera por periodo: el saldo se arrastra y los retiros salen aparte", () => {
+  const f = (dia: string, ent: number, sal: number, retiro: number, saldoCierre: number | null) => ({ dia, totalEntra: ent, totalSale: sal, saldoCierre,
+    entra: { ganancia: ent, propia: 0, otros: 0 }, sale: { tarjeta: sal - retiro, descuentos: 0, retiros: retiro } });
+  const ps = listarPeriodos("2026-09-26", "2026-10-19", 12);
+  const [a, b] = flujoPorPeriodo([f("2026-10-01", 500000, 100000, 0, 400000), f("2026-10-14", 50000, 200000, 150000, 250000)], ps);
+  assert.equal(a.saldoApertura, 0); assert.equal(a.saldoCierre, 400000);
+  assert.equal(b.saldoApertura, 400000); assert.equal(b.saldoCierre, 250000); assert.equal(b.retiros, 150000);
+  const [, sinMov] = flujoPorPeriodo([f("2026-10-01", 500000, 100000, 0, 400000)], ps);
+  assert.equal(sinMov.saldoApertura, 400000); assert.equal(sinMov.saldoCierre, 400000); // sin movimientos: el saldo sigue ahí
+});
+
+import { pedidosPorPeriodo } from "./periodos.ts";
+test("pedidos por corte: cada uno vive en el corte donde se creó y lo pendiente no desaparece al cortar", () => {
+  const ps = listarPeriodos("2026-09-26", "2026-10-19", 12);
+  const p = (creado: string, contable: string, total: number, extra = {}) => ({ creado, contable, total, ...extra });
+  const [a, b] = pedidosPorPeriodo([
+    p("2026-10-05", "en_curso", 100000, { pagadoDia: "2026-10-15" }), // vendido en el corte 1, la billetera lo pagó en el corte 2
+    p("2026-10-08", "sin_pagar", 80000, {}),
+    p("2026-10-09", "pagado", 60000, { pagadoDia: "2026-10-11" }),
+    p("2026-10-10", "devuelto", 50000, { cobradoDia: "2026-10-18" }),
+    p("2026-10-14", "en_curso", 70000),
+    p("2026-10-12", "devuelto_cobrado", 40000, { cobradoDia: "2026-10-12" }),
+  ], ps);
+  assert.equal(a.vendidos.n, 5); assert.equal(b.vendidos.n, 1);
+  assert.equal(a.estado.sin_pagar.valor, 80000); assert.equal(a.estado.pagado.n, 1);
+  assert.deepEqual(a.pendientes, { n: 3, valor: 230000 }); // en curso + sin pagar + devuelto sin cobrar
+  assert.deepEqual(b.pendientes, { n: 1, valor: 70000 });
+  assert.deepEqual(b.cierranAnteriores, { n: 2, valor: 150000 }); // el pago del 15 y el cobro del 18 cierran ventas del corte 1
+  assert.equal(a.cierranAnteriores.n, 0);
+  assert.equal(a.vendidos.n + b.vendidos.n, 6); // ningún pedido se pierde
+});
+
+import { estimarPendientes } from "./estimacion.ts";
+import { repartirUtilidad, validarReparto, REPARTO_DEFECTO } from "./reparto.ts";
+import { evaluarSalud, type EntradaSalud } from "./salud.ts";
+import { ritmoPauta, deudaMeta } from "./pauta.ts";
+import { cambiosDesdeCierre, chequear, type Foto } from "./cierre.ts";
+import { ventasPorPeriodo, tasaDevolucionReal } from "./periodos.ts";
+
+test("estimación: en curso descuenta el % de devolución de su campaña; entregado sin pagar entra completo; devuelto cuesta el flete", () => {
+  const ps = listarPeriodos("2026-09-26", "2026-10-19", 12);
+  const peds = [
+    { creado: "2026-10-05", contable: "en_curso", campanaId: "1" }, { creado: "2026-10-06", contable: "sin_pagar", campanaId: "1" },
+    { creado: "2026-10-07", contable: "devuelto", campanaId: "1" }, { creado: "2026-10-08", contable: "en_curso", campanaId: "9" }, // campaña 9 sin ganancia media: usa la global
+    { creado: "2026-10-09", contable: "pagado", campanaId: "1" }, // lo real no se estima
+  ];
+  const e = estimarPendientes(peds, ps, { gananciaMedia: new Map([["1", 50000]]), gananciaGlobal: 40000, pctDevolucion: new Map([["1", 20]]), fleteDevolucion: 15000 }).get("2026-10-12")!;
+  // en curso c1: 50.000×0,8=40.000 · sin pagar c1: 50.000 · en curso c9: 40.000×0,85 (15 % por defecto)=34.000
+  assert.equal(e.gananciaEsperada, 124000);
+  // flete: en curso c1 0,2×15.000=3.000 · devuelto 15.000 · en curso c9 0,15×15.000=2.250
+  assert.equal(e.costoDevoluciones, 20250); assert.equal(e.sinReferencia, 0);
+  const sin = estimarPendientes([{ creado: "2026-10-05", contable: "en_curso" }], ps, { gananciaMedia: new Map(), gananciaGlobal: null, pctDevolucion: new Map(), fleteDevolucion: null }).get("2026-10-12")!;
+  assert.equal(sin.sinReferencia, 1); assert.equal(sin.gananciaEsperada, 0);
+});
+test("ritmo de pauta: promedio por día ACTIVO (la pausa no cuenta como gasto bajo) y deuda con Meta", () => {
+  const g = [["2026-10-12", 67016], ["2026-10-13", 36011], ["2026-10-14", 0], ["2026-10-15", 0], ["2026-10-16", 87], ["2026-10-17", 103249], ["2026-10-18", 71640], ["2026-10-19", 16435]].map(([dia, gasto]) => ({ dia: dia as string, gasto: gasto as number }));
+  const r = ritmoPauta(g, "2026-10-18"); // el día de hoy (a medias) no entra
+  assert.equal(r.diasActivos, 4); assert.equal(r.promedio7, 69479); assert.equal(r.ultimos3, 70300); assert.equal(r.ritmo, 70300); // el promedio de 7 días corridos habría sido ~39.800
+  assert.equal(ritmoPauta(g, "2026-10-15").ritmo, 51513.5); // solo 12 y 13 activos en la ventana
+  assert.equal(ritmoPauta([], "2026-10-18").ritmo, 0);
+  assert.equal(deudaMeta(g, [{ dia: "2026-10-17", monto: 100000 }, { dia: "2026-10-19", monto: 95000 }], "2026-10-18"), 178003); // gastado hasta el 18 (278.003) − cobrado hasta el 18 (100.000)
+  assert.equal(deudaMeta(g, [{ dia: "2026-10-12", monto: 999999 }], "2026-10-18"), 0); // nunca negativa
+});
+test("reparto de la utilidad: los porcentajes se aplican a la utilidad y la suma es exactamente esa utilidad", () => {
+  assert.equal(validarReparto(REPARTO_DEFECTO), null);
+  assert.match(validarReparto([{ id: "a", nombre: "A", pct: 60, tipo: "socio" }, { id: "b", nombre: "B", pct: 30, tipo: "socio" }])!, /suman 90/);
+  assert.ok(validarReparto([{ id: "a", nombre: "A", pct: 100, tipo: "xx" }] as never));
+  const f = repartirUtilidad(REPARTO_DEFECTO, 299095);
+  assert.deepEqual(f.map((x) => x.monto), [74773.75, 29909.5, 29909.5, 14954.75, 74773.75, 74773.75]);
+  assert.equal(Math.round(f.reduce((a, x) => a + x.monto, 0) * 100) / 100, 299095);
+  assert.deepEqual(repartirUtilidad(REPARTO_DEFECTO, -5).map((x) => x.monto), [0, 0, 0, 0, 0, 0]); // sin utilidad no se reparte nada
+});
+const ent = (o: Partial<EntradaSalud> = {}): EntradaSalud => ({ saldoBilletera: 808724, saldoTarjeta: 17580, utilidadAcumulada: 299095, retirado: 0, ritmoPauta: 70300, deudaMeta: 468,
+  costoDevolucionesEsperado: 85184, gananciaEsperada: 900000, diasPago: 5, hoy: "2026-10-19", destinos: REPARTO_DEFECTO, cuadreMalo: false, datosViejos: false, ...o });
+const salud = (o: Partial<EntradaSalud> = {}) => evaluarSalud(ent(o));
+test("salud: la billetera debe cubrir el piso (7 días de pauta al ritmo real + deuda con Meta + devoluciones) más imprevistos, ahorro e impuestos; solo lo que sobra se retira", () => {
+  const s = salud();
+  // pauta: 468 + 70.300 × 7 − 17.580 (tarjeta) = 474.988 · devoluciones 85.184 · imprevistos+ahorro+impuestos 25 % de 299.095 = 74.773,75 (la reinversión extra no se suma: ya está en el piso)
+  assert.equal(s.piso.pauta, 474988); assert.equal(s.piso.devoluciones, 85184); assert.equal(s.seQueda, 74773.75); assert.equal(s.bloqueado, 634945.75);
+  assert.equal(s.libre, 173778.25); assert.equal(s.bloqueado + s.libre, 808724);
+  assert.equal(s.sociasAcumulado, 149547.5); assert.equal(s.retiroSeguro, 149547.5); assert.equal(s.limitadoPor, "plan"); assert.equal(s.estado, "verde"); // les toca 149.547,5 y caben
+  assert.equal(s.piso.diasCubiertos, 9.47);
+  assert.ok(s.proyeccion && s.proyeccion.fecha === "2026-10-24" && s.proyeccion.retiro === 381205.5); // con lo que viene en camino (estimado) les toca todo lo suyo
+  assert.ok(s.retiroSeguro <= s.utilidadRetenida && s.retiroSeguro <= s.sociasPorRetirar && s.retiroSeguro <= Math.max(0, s.libre)); // invariante: nunca se retira más que ninguno de los tres límites
+  const justo = salud({ saldoBilletera: 700000 }); // sobra 700.000 − 634.945,75 = 65.054,25: ahí sí limita lo que sobra
+  assert.equal(justo.retiroSeguro, 65054.25); assert.equal(justo.limitadoPor, "necesidades"); assert.equal(justo.estado, "amarillo");
+});
+test("salud: con la billetera holgada puede retirar lo que les toca a las socias; los retiros ya hechos se descuentan", () => {
+  const v = salud({ saldoBilletera: 2000000 });
+  assert.equal(v.estado, "verde"); assert.equal(v.limitadoPor, "plan"); assert.equal(v.retiroSeguro, 149547.5);
+  const r = salud({ saldoBilletera: 2000000, retirado: 100000 });
+  assert.equal(r.sociasPorRetirar, 49547.5); assert.equal(r.retiroSeguro, 49547.5); assert.equal(r.utilidadRetenida, 199095);
+  assert.equal(salud({ saldoBilletera: 2000000, retirado: 150000 }).estado, "gris"); // ya retiró todo lo que les tocaba
+});
+test("salud: sin utilidad acumulada no hay nada que retirar aunque la billetera tenga plata (aportes y capital no son ganancia)", () => {
+  const sin = salud({ saldoBilletera: 2000000, utilidadAcumulada: -275175 });
+  assert.equal(sin.retiroSeguro, 0); assert.equal(sin.estado, "gris"); assert.equal(sin.utilidadAcumulada, 0);
+});
+test("salud: un ritmo de pauta alto o una deuda con Meta grande suben el piso y pueden poner la señal en rojo", () => {
+  const s = salud({ ritmoPauta: 150000, deudaMeta: 100000, costoDevolucionesEsperado: 300000, saldoTarjeta: 0 }); // 100.000 + 1.050.000 de pauta
+  assert.equal(s.piso.pauta, 1150000); assert.equal(s.retiroSeguro, 0); assert.equal(s.estado, "rojo");
+});
+test("salud: cuadre malo, datos viejos, sin saldo y sin socias", () => {
+  assert.equal(salud({ cuadreMalo: true }).estado, "rojo");
+  const v = salud({ saldoBilletera: 2000000, datosViejos: true }); assert.equal(v.estado, "amarillo"); assert.match(v.detalle, /sincroniza/i);
+  assert.equal(salud({ saldoBilletera: null }).estado, "gris");
+  assert.equal(salud({ destinos: REPARTO_DEFECTO.map((d) => (d.tipo === "socio" ? { ...d, pct: 0 } : d.id === "pauta" ? { ...d, pct: 75 } : d)) }).estado, "gris"); // sin socias no hay a quién retirar
+});
+test("cierre: compara lo sellado con lo vivo y los chequeos avisan lo importante", () => {
+  const f = (o: Partial<Foto> = {}): Foto => ({ v: 2, desde: "2026-09-26", hasta: "2026-10-12", ganancia: 796687, publicidad: 895162, otrosGastos: 0, devoluciones: 24295, comisiones: 15848, otrosDescuentos: 0, herramientas: 0, costos: 1071862, neto: -275175,
+    pagados: 16, saldoApertura: 0, saldoCierre: 242894, entro: 800000, salio: 557106, retiros: 0, vendidos: 39, pendientesN: 8, pendientesValor: 839200, gananciaEsperada: 0, costoDevolucionesEsperado: 0, base: 0, retiroSeguro: 0, reparto: [], ...o });
+  const c = cambiosDesdeCierre(f(), f({ ganancia: 846687, neto: -225175, pendientesN: 7 }));
+  assert.deepEqual(c.map((x) => [x.campo, x.dif]), [["ganancia", 50000], ["neto", 50000], ["pendientesN", -1]]);
+  assert.equal(cambiosDesdeCierre(f(), f()).length, 0);
+  const base = { abierto: false, saldoApertura: 0, entro: 800000, salio: 557106, saldoCierre: 242894, herramientasMensual: 0, pagosHerramientas: 0, anticipos: { n: 0, monto: 0 }, horasDropi: 2, horasMeta: 2, noVerificables: 0, cobrosMetaSinTarjeta: 0, cargosRepetidos: 0, devolucionReal: 10, devolucionEsperada: 15, sinReferencia: 0, sumaCortes: 100, totalDias: 100 };
+  assert.deepEqual(chequear(base).map((x) => x.clave + ":" + x.tono), ["saldo:ok", "suma:ok", "herramientas:warn"]);
+  assert.deepEqual(chequear({ ...base, pagosHerramientas: 136558, anticipos: { n: 1, monto: 34369 } }).map((x) => x.clave + ":" + x.tono), ["saldo:ok", "suma:ok", "herramientas:ok", "anticipos:info"]);
+  const mal = chequear({ ...base, saldoCierre: 243274, horasDropi: 50, devolucionReal: 22, cargosRepetidos: 1, sumaCortes: 90 }).map((x) => x.clave + ":" + x.tono);
+  assert.deepEqual(mal, ["saldo:bad", "suma:bad", "herramientas:warn", "dropi:warn", "repetidos:bad", "devol:warn"]);
+});
+test("ventas por corte y devolución real", () => {
+  const ps = listarPeriodos("2026-09-26", "2026-10-19", 12);
+  const [a, b] = ventasPorPeriodo([{ dia: "2026-10-05", ventas: 4, pagados: 2, enCamino: 1, devueltos: 1, entro: 100000, publicidad: 60000 }, { dia: "2026-10-13", ventas: 3, pagados: 0, enCamino: 3, devueltos: 0, entro: 0, publicidad: 30000 }], ps);
+  assert.deepEqual([a.ventas, a.cobrado, a.publicidad, b.ventas, b.enCamino], [4, 100000, 60000, 3, 3]);
+  const [p1] = pedidosPorPeriodo([{ creado: "2026-10-01", contable: "pagado" }, { creado: "2026-10-02", contable: "pagado" }, { creado: "2026-10-03", contable: "pagado" }, { creado: "2026-10-04", contable: "devuelto" }, { creado: "2026-10-05", contable: "en_curso" }], ps);
+  assert.equal(tasaDevolucionReal(p1), 25); // 1 de 4 que ya terminaron; el que sigue en curso no cuenta
+});
+test("flujo: el último periodo cierra en el saldo actual que informa Dropi", () => {
+  const f = (dia: string, ent: number, sal: number, saldoCierre: number | null) => ({ dia, totalEntra: ent, totalSale: sal, saldoCierre, entra: { ganancia: ent, propia: 0, otros: 0 }, sale: { tarjeta: sal, descuentos: 0, retiros: 0 } });
+  const ps = listarPeriodos("2026-09-26", "2026-10-19", 12);
+  const r = flujoPorPeriodo([f("2026-10-01", 500000, 100000, 400000), f("2026-10-18", 10000, 0, null)], ps, 410000);
+  assert.equal(r[0].saldoCierre, 400000); assert.equal(r[1].saldoApertura, 400000); assert.equal(r[1].saldoCierre, 410000);
+});
+
+test("pedido con pago anticipado: entregado y cobrado por fuera de Dropi no queda como «sin pagar»", () => {
+  const ped = [{ idPedido: "A", estado: "ENTREGADO", entregadoDia: "2026-10-13", total: 89900 }, { idPedido: "B", estado: "ENTREGADO", entregadoDia: "2026-10-13", total: 89900 }, { idPedido: "C", estado: "EN RUTA", total: 89900 }];
+  const r = clasificarPedidos(ped, [], [], "2026-09-26", "2026-10-19", ["A", "C"]);
+  assert.deepEqual(r.map((x) => x.contable), ["pagado", "sin_pagar", "en_curso"]); // A ya cobrado; B sí espera a Dropi; C aún no se entrega
+  assert.equal(r[0].anticipado, true); assert.equal(r[1].anticipado, undefined);
+});
+
+import { resolverPeriodo } from "./periodos.ts";
+test("selector de periodo: actual, anterior, un corte, todo y rango libre; lo que no se entiende cae en el corte actual", () => {
+  const ps = listarPeriodos("2026-09-26", "2026-10-19", 12), hoy = "2026-10-19", ini = "2026-09-26";
+  const r = (x?: string | null) => resolverPeriodo(x, ps, hoy, ini);
+  assert.deepEqual([r().tipo, r().id, r().abierto], ["corte", "2026-11-12", true]);
+  assert.equal(r("anterior").id, "2026-10-12"); assert.equal(r("anterior").desde, "2026-09-26");
+  assert.equal(r("2026-10-12").id, "2026-10-12");
+  assert.deepEqual([r("todo").tipo, r("todo").desde, r("todo").hasta], ["todo", ini, hoy]);
+  const g = r("2026-10-01_2026-10-15"); assert.deepEqual([g.tipo, g.desde, g.hasta, g.abierto], ["rango", "2026-10-01", "2026-10-15", false]);
+  const recorte = r("2026-08-01_2027-01-01"); assert.deepEqual([recorte.desde, recorte.hasta], [ini, hoy]); // se recorta a lo que existe
+  for (const mal of ["basura", "2026-13-45", "2026-10-20_2026-10-01", "2026-10-12_", "' OR 1=1 --", "2030-01-01"]) assert.equal(r(mal).id, "2026-11-12"); // nunca falla
+  assert.equal(resolverPeriodo("anterior", listarPeriodos("2026-09-26", "2026-10-05", 12), "2026-10-05", ini).param, "actual"); // con un solo corte no hay anterior
+});

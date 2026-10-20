@@ -1,14 +1,14 @@
-import { cop, corto, fmtN, diaCorto, cpm, ctr, pct } from '@/lib/formato'
+import { cop, fmtN, diaCorto, pct } from '@/lib/formato'
 import CobrosMeta from '@/components/CobrosMeta'
-import { hoyBogota, sumarDias } from '@/domain/fechas.ts'
+import { hoyBogota } from '@/domain/fechas.ts'
 import Link from 'next/link'
-import { TablaTarjeta, TablaBilletera, TablaPedidos, TablaDias, TablaGastoMeta } from './TablasDatos'
+import { TablaTarjeta, TablaBilletera, TablaPedidos, TablaGastoMeta } from './TablasDatos'
+import { PanelSalud } from './PanelSalud'
+import { ResumenPeriodo } from './ResumenPeriodo'
 import BilleteraVisual from './BilleteraVisual'
 import TarjetaDropi from './TarjetaDropi'
 import GraficaDias from '@/components/graficas/GraficaDias'
-import GananciaSemana from '@/components/graficas/GananciaSemana'
 import Ayuda from '@/components/Ayuda'
-import { costoPorVenta, repartoDeCostos, costosDelDia } from '@/domain/porDia.ts'
 
 // Vistas de solo lectura de los datos sincronizados. Componentes de servidor: reciben datos ya calculados (src/lib/datos.js + src/domain).
 const Chip = ({ t, children }) => <span className={'chip ' + t}>{children}</span>
@@ -101,80 +101,7 @@ export function VistaPedidos({ d, vacio, ocultarCampana = false, sinKpis = false
 }
 
 /* ---------- Ganancia por día ---------- */
-export function VistaGananciaDia({ d }) {
-  if (!d.dias.length) return <Aviso tono="blue" titulo="Aún no hay datos para calcular tu ganancia">Sincroniza tu billetera y tu tarjeta en Mis cuentas → Dropi.</Aviso>
-  const r = d.resumen
-  const tono = r.veredicto === 'gana' ? 'ok' : r.veredicto === 'pierde' ? 'bad' : 'warn'
-  const col = { ok: 'jade-ink', bad: 'coral-ink', warn: 'gold-ink' }[tono]
-  const costos = [['Publicidad en Meta (con IVA)', r.total.meta], ['Otros gastos de la tarjeta', r.total.otrosGastos], ['Devoluciones', r.total.devoluciones], ['Comisiones y mantenimiento de la tarjeta', r.total.comisiones], ['Otros descuentos de Dropi', r.total.otrosDescuentos], ['Herramientas', r.herramientas]].filter((x) => x[1] > 0)
-  const top = [...costos].sort((a, b) => b[1] - a[1])[0]
-  const retorno = r.retornoPorPesoEnMeta
-  return (
-    <>
-      <div className={'tint ' + tono} style={{ marginBottom: 16 }}>
-        <b style={{ fontSize: 24, color: `var(--${col})` }}>{r.veredicto === 'gana' ? 'Estás GANANDO' : r.veredicto === 'pierde' ? 'Estás PERDIENDO' : 'Estás en equilibrio'}: {cop(r.neto)}</b>
-        <div style={{ fontSize: 14.5, marginTop: 4 }}>
-          Ganancias de pedidos entregados {cop(r.total.ganancia)} menos {cop(r.costos)} de costos, de {fmtN(d.dias.length)} {d.dias.length === 1 ? 'día' : 'días'} con movimientos.
-          {retorno != null && <> Por cada <b>$1</b> en Meta recuperas <b>${retorno.toFixed(2)}</b> de ganancia.</>}
-          {r.veredicto === 'pierde' && top && <> Lo que más pesa es <b>{top[0].toLowerCase()}</b> ({cop(top[1])}).</>}
-        </div>
-        <div className="muted only-learner" style={{ fontSize: 13, marginTop: 6 }}>La ganancia de un pedido entra a la billetera cuando se <b>entrega</b>: si pautas mucho ahora, los pedidos en camino todavía no cuentan y puede verse peor de lo que será.</div>
-      </div>
-      {!d.hayCobros && <Aviso titulo="Sin cobros de Meta cargados">El gasto en Meta aparece dentro de «otros gastos de la tarjeta». El total no cambia; cuando se conecte Meta se separa.</Aviso>}
-      <GraficaDias vistas={VISTAS(d.venta, d.serie, d.herramientasPorDia)} tipo="barras" metrica={{ tipo: 'neto' }} formato="cop" termino="ganancia_neta" subtitulo="Ya descuenta publicidad, devoluciones y comisiones"
-        ayuda="cada barra es lo que entró menos lo que gastaste. «Por día de venta» muestra lo que hizo cada día de ventas; «Por día de pago» muestra cuándo se movió la plata." />
-      <TablaDias dias={d.dias} />
-      {d.herramientasPorDia > 0 && <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Las herramientas ({cop(d.herramientasPorDia)} por día) se descuentan solo en el total, no en cada día.</p>}
-    </>
-  )
-}
-
-/* ---------- Caja ---------- */
-export function VistaCaja({ d }) {
-  const hace = d.tarjeta ? Math.max(1, Math.round((Date.now() - d.tarjeta.leido) / 60000)) : null
-  return (
-    <>
-      {!d.tarjeta && <Aviso tono="blue" titulo="Aún no hay saldo de la tarjeta">Conecta Dropi y sincroniza: el saldo lo informa Dropi, no se calcula.</Aviso>}
-      <div className="kpis">
-        <Kpi l="Disponible en tu tarjeta" v={d.tarjeta ? cop(d.tarjeta.monto) : '—'} nota={d.tarjeta ? `según Dropi, leído hace ${hace < 60 ? hace + ' min' : Math.round(hace / 60) + ' h'}` : null} />
-        <Kpi l="En tu billetera" v={d.billetera == null ? '—' : cop(d.billetera)} nota="según el último movimiento" />
-        <Kpi l="Pedidos entregados" v={fmtN(d.entregados.n)} nota={`por ${cop(d.entregados.valor)} en total`} />
-      </div>
-      <p className="muted only-learner" style={{ fontSize: 14, marginTop: 14 }}>El saldo de la tarjeta lo informa Dropi y nunca se calcula: así no puede quedar en negativo por datos que faltan. Para saber para cuántos días alcanza falta el gasto diario de Meta (llega con la conexión a Meta Ads).</p>
-    </>
-  )
-}
-
 /* ---------- Dashboard ---------- */
-/** Sigue tu plata de izquierda a derecha (diseño de las cajas con flechas de la app original): billetera → tarjeta → lo que gastaste → tus pedidos. */
-function FlujoDinero({ d }) {
-  const t = d.ganancia.resumen.total, c = d.pedidos.cuenta
-  const dev = (c.devuelto || 0) + (c.devuelto_cobrado || 0), entregados = (c.pagado || 0) + (c.sin_pagar || 0) + (c.no_verificable || 0), enCurso = c.en_curso || 0
-  const caja = (n, titulo, grande, sub, extra) => (
-    <div className="card md-box">
-      <div className="md-ttl"><span className="md-n">{n}</span>{titulo}</div>
-      <div className="md-big">{grande}</div>
-      <div className="md-sub">{sub}</div>
-      {extra && <div style={{ marginTop: 10 }}>{extra}</div>}
-    </div>
-  )
-  const flecha = <div className="md-warrow" aria-hidden="true">→</div>
-  return (
-    <>
-      <div className="md-flow" style={{ marginTop: 16 }}>
-        {caja(1, 'Billetera', d.caja.billetera == null ? '—' : cop(d.caja.billetera), 'Ganancias de tus ventas entregadas, en Dropi.')}
-        {flecha}
-        {caja(2, 'Tarjeta', d.caja.tarjeta ? cop(d.caja.tarjeta.monto) : '—', 'Con esto se paga la publicidad. El saldo lo informa Dropi.')}
-        {flecha}
-        {caja(3, 'Gastaste', cop(t.meta + t.otrosGastos), 'Salió de tu tarjeta.', d.hayCobros ? <Chip t="blue">Meta {cop(t.meta)} · otros {cop(t.otrosGastos)}</Chip> : <Chip t="idle">Meta se separa al conectarla</Chip>)}
-        {flecha}
-        {caja(4, 'Pedidos', fmtN(d.pedidos.lista.length), `${fmtN(d.pedidos.hoy)} hoy · ${fmtN(enCurso)} en curso · ${fmtN(entregados)} entregados · ${fmtN(dev)} devueltos`)}
-      </div>
-      <p className="md-how only-learner" style={{ margin: '0 0 4px' }}><b>Cómo leer esto:</b> sigue tu plata de izquierda a derecha. <b>1)</b> lo que ganas y llega a tu billetera, <b>2)</b> lo que pasas a la tarjeta, <b>3)</b> lo que gastas (publicidad y otros), <b>4)</b> los pedidos que lo generan.</p>
-    </>
-  )
-}
-
 /** La pregunta principal: ¿cuándo recupero la inversión? Cuánto invertiste, cuánto llevas recuperado, qué falta y cuándo (al ritmo de la última semana). */
 function TarjetaRecuperacion({ rec, enCamino, vacio }) {
   if (vacio) return <Aviso tono="blue" titulo="¿Cuándo recupero mi inversión?">Todavía no hay datos. Conecta Dropi y sincroniza (Mis cuentas): aquí verás cuánto has invertido, cuánto llevas recuperado y cuándo lo recuperas.</Aviso>
@@ -182,7 +109,7 @@ function TarjetaRecuperacion({ rec, enCamino, vacio }) {
   const color = ok ? '#10B981' : mal ? '#F59E0B' : '#3B82F6'
   const ink = ok ? 'var(--jade-ink)' : mal ? 'var(--gold-ink)' : 'var(--blue)'
   const fecha = rec.fecha ? new Date(rec.fecha + 'T12:00:00Z').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', timeZone: 'UTC' }) : null
-  const titulo = ok ? '¡Ya recuperaste tu inversión!' : `Has recuperado el ${rec.pct} % de lo que invertiste`
+  const titulo = ok ? '¡Ya recuperaste tu inversión!' : `Ya te entró el ${rec.pct} % de lo que gastaste`
   return (
     <div className="card" style={{ borderColor: ok ? 'var(--jade-line)' : undefined }}>
       <div className="kpi-l">¿Cuándo recupero mi inversión?<Ayuda t="recuperacion" /></div>
@@ -191,8 +118,8 @@ function TarjetaRecuperacion({ rec, enCamino, vacio }) {
         <div style={{ width: `${Math.max(rec.pct ?? 0, rec.pct ? 2 : 0)}%`, height: '100%', background: color, borderRadius: 999, transition: 'width .4s' }} />
       </div>
       <div style={{ display: 'flex', gap: '10px 34px', flexWrap: 'wrap', marginTop: 16 }}>
-        <div><div className="muted" style={{ fontSize: 13 }}>Invertiste<Ayuda t="invertido" /></div><div className="num" style={{ fontSize: 22, fontWeight: 700 }}>{cop(rec.invertido)}</div></div>
-        <div><div className="muted" style={{ fontSize: 13 }}>Recuperaste<Ayuda t="recuperado" /></div><div className="num" style={{ fontSize: 22, fontWeight: 700, color: 'var(--jade-ink)' }}>{cop(rec.recuperado)}</div></div>
+        <div><div className="muted" style={{ fontSize: 13 }}>Gastaste en total<Ayuda t="invertido" /></div><div className="num" style={{ fontSize: 22, fontWeight: 700 }}>{cop(rec.invertido)}</div></div>
+        <div><div className="muted" style={{ fontSize: 13 }}>Entró en total<Ayuda t="recuperado" /></div><div className="num" style={{ fontSize: 22, fontWeight: 700, color: 'var(--jade-ink)' }}>{cop(rec.recuperado)}</div></div>
         <div><div className="muted" style={{ fontSize: 13 }}>{ok ? 'Ganancia después de recuperar' : 'Te faltan'}</div><div className="num" style={{ fontSize: 22, fontWeight: 700, color: ok ? 'var(--jade-ink)' : ink }}>{cop(ok ? rec.excedente : rec.faltan)}</div></div>
       </div>
       <div className={'tint ' + (ok ? 'ok' : mal ? 'warn' : 'blue')} style={{ marginTop: 16, padding: '12px 16px', fontSize: 14.5 }}>
@@ -201,45 +128,43 @@ function TarjetaRecuperacion({ rec, enCamino, vacio }) {
         {mal && <>Con el ritmo de la última semana <b>todavía no se recupera</b>: estás gastando {cop(-rec.ritmo)} más por día de lo que entra. Revisa en qué se va la plata y qué campañas no están dejando.</>}
       </div>
       <p className="muted only-learner" style={{ fontSize: 13, margin: '12px 0 0' }}>
-        <b>Invertiste</b> = publicidad, devoluciones, comisiones, otros gastos de la tarjeta y herramientas, desde el {diaCorto(rec.desde)}. <b>Recuperaste</b> = ganancias de pedidos entregados que ya entraron a tu billetera.
+        <b>Gastaste en total</b> = publicidad, devoluciones, comisiones, otros gastos de la tarjeta y herramientas, desde el {diaCorto(rec.desde)}. <b>Entró en total</b> = ganancias de pedidos entregados que ya entraron a tu billetera. Recuperas tu inversión cuando lo que entró iguala lo que gastaste.
         {enCamino.n > 0 && <> Además hay {fmtN(enCamino.n)} {enCamino.n === 1 ? 'pedido' : 'pedidos'} en camino por {cop(enCamino.valor)} en total: su ganancia todavía no cuenta.</>}
       </p>
-      <div style={{ marginTop: 10 }}><Link href="/contabilidad/a-donde-va-mi-plata" className="link" style={{ fontSize: 14 }}>Ver en qué se fue la plata →</Link></div>
+      <div style={{ marginTop: 10 }}><Link href="/contabilidad" className="link" style={{ fontSize: 14 }}>Ver en qué se fue la plata →</Link></div>
     </div>
   )
 }
 
-const VISTAS = (venta, caja, herr = 0) => [
+export const VISTAS = (venta, caja, herr = 0) => [
   { clave: 'venta', etiqueta: 'Por día de venta', dias: venta.serie, nota: 'Cada pedido se cuenta el día que se vendió (cobrado = su ganancia real en tu billetera) y la publicidad el día que Meta la gastó, con IVA. Los pedidos en camino aún no suman ganancia: sus días pueden verse bajos hasta que se entreguen.' },
   { clave: 'pago', etiqueta: 'Por día de pago (caja)', dias: caja.map((x) => ({ ...x, gasto: x.gasto - herr })), nota: 'Cuenta la plata el día en que se mueve: la ganancia cuando Dropi la paga a tu billetera y el gasto cuando se carga a tu tarjeta. Dropi paga días después de la venta, por eso hay días rojos aunque las ventas sean buenas.' },
 ]
 
-/** Dashboard: la ganancia de la semana y, debajo, el resultado acumulado (cuándo se cruza el $0) y el neto día a día. */
-function GraficasDashboard({ serie, venta }) {
+/** Resultado acumulado desde el inicio: cuando la línea cruza el $0 ya recuperaste. (El día por día está en Contabilidad → Cortes.) */
+function GraficaAcumulado({ serie }) {
   if (serie.length < 2) return null
   return (
-    <>
-      <GananciaSemana dias={serie.slice(-7)} />
-      <div style={{ height: 16 }} />
-      <GraficaDias dias={serie} tipo="linea" metrica={{ tipo: 'ultimo', campo: 'acumulado' }} formato="cop" color="var(--blue)" termino="recuperacion"
-        titularPos="Ya recuperaste tu inversión: llevas {v} de ganancia" titularNeg="Te faltan {v} para recuperar tu inversión" subtitulo="Resultado acumulado desde el inicio de la operación"
-        ayuda="cada punto es lo que llevas ganado menos lo que llevas gastado hasta ese día. Cuando la línea sube por encima del $0, ya recuperaste lo invertido. Si baja, ese período gastaste más de lo que entró." />
-      <GraficaDias vistas={VISTAS(venta, serie)} tipo="barras" metrica={{ tipo: 'neto' }} formato="cop" termino="ganancia_neta" subtitulo="Ya descuenta publicidad, devoluciones, comisiones y herramientas"
-        ayuda="verde = ese día te quedó plata; roja = gastaste más de lo que entró. «Por día de venta» cuenta cada pedido el día que se vendió y la publicidad el día que Meta la gastó: muestra lo que hizo la campaña ese día. «Por día de pago» es la caja: cuándo entró la plata a tu billetera." />
-    </>
+    <GraficaDias dias={serie} tipo="linea" metrica={{ tipo: 'ultimo', campo: 'acumulado' }} formato="cop" color="var(--blue)" termino="recuperacion"
+      titularPos="Ya recuperaste tu inversión: llevas {v} de ganancia" titularNeg="Te faltan {v} para recuperar tu inversión" subtitulo="Resultado acumulado desde el inicio de la operación"
+      ayuda="cada punto es lo que llevas ganado menos lo que llevas gastado hasta ese día. Cuando la línea sube por encima del $0, ya recuperaste lo invertido. Si baja, ese periodo gastaste más de lo que entró." />
   )
 }
 
+/** Inicio: cuatro respuestas, en este orden: ¿cuánto puedo retirar? · ¿cómo voy en este corte? · ¿cuándo recupero mi inversión? · ¿qué tengo que revisar? */
 export function VistaDashboard({ d }) {
-  const vacio = !d.ganancia.dias.length
+  const vacio = !d.ganancia.dias.length, base = d.cortes
+  const actual = base.cortes.find((c) => c.abierto) || base.cortes[0]
   return (
     <>
+      {!vacio && <PanelSalud s={base.salud} ritmo={base.ritmoPauta} titulo="1 · ¿Cuánto puedo retirar hoy?" />}
+      {!vacio && actual && <ResumenPeriodo c={actual} per={{ tipo: 'corte', id: actual.id, abierto: actual.abierto }} hoy={base.hoy} titulo="2 · ¿Cómo voy en este corte?" enlace={{ href: '/contabilidad', texto: 'Ver el detalle del dinero' }} />}
+
+      <div className="sec-head" style={{ margin: '0 0 12px' }}><h2>3 · ¿Cuándo recupero mi inversión?</h2></div>
       <TarjetaRecuperacion rec={d.rec} enCamino={d.enCamino} vacio={vacio} />
-      <FlujoDinero d={d} />
+      {!vacio && <div style={{ marginTop: 16 }}><GraficaAcumulado serie={d.ganancia.serie} /></div>}
 
-      {!vacio && <GraficasDashboard serie={d.ganancia.serie} venta={d.ganancia.venta} />}
-
-      <div className="sec-head" style={{ margin: '26px 0 12px' }}><h2>Qué mirar hoy</h2></div>
+      <div className="sec-head" style={{ margin: '26px 0 12px' }}><h2>4 · ¿Qué tengo que revisar?</h2></div>
       {d.aviso.length === 0
         ? <Aviso tono="ok" titulo="Todo en orden">No veo nada raro: tus datos están al día y no hay cargos repetidos ni pedidos esperando pago.</Aviso>
         : d.aviso.map((a) => (
@@ -248,67 +173,6 @@ export function VistaDashboard({ d }) {
             <Link href={a.href} className="btn ghost sm">{a.ir}</Link>
           </div>
         ))}
-    </>
-  )
-}
-
-/* ---------- Costo por venta ---------- */
-export function VistaCostoPorVenta({ d }) {
-  if (!d.dias.length) return <Aviso tono="blue" titulo="Aún no hay datos">Sincroniza tu billetera y tu tarjeta en Mis cuentas → Dropi.</Aviso>
-  const c = d.venta.costo, sinGasto = !(c.gasto > 0)
-  const bien = c.quedaPorEntrega != null && c.quedaPorEntrega >= 0
-  return (
-    <>
-      {sinGasto && <Aviso titulo="El costo por venta necesita el gasto en publicidad">Conecta Meta y sincroniza (Campañas), o carga los cobros de Meta: así sé cuánto gastaste en anuncios.</Aviso>}
-      {!sinGasto && c.cpaEntrega != null && c.gananciaPorPedido != null && (
-        <div className={'tint ' + (bien ? 'ok' : 'warn')} style={{ marginBottom: 16 }}>
-          <b style={{ fontSize: 19, color: bien ? 'var(--jade-ink)' : 'var(--gold-ink)' }}>Hoy cada pedido entregado te cuesta {cop(c.cpaEntrega)} en publicidad y te deja {cop(c.gananciaPorPedido)}: {bien ? `te quedan ${cop(c.quedaPorEntrega)} por pedido` : `pierdes ${cop(-c.quedaPorEntrega)} por pedido`}.</b>
-          {c.enCamino > 0 && c.mejorCaso != null && <div style={{ fontSize: 14.5, marginTop: 4 }}>Pero tienes <b>{fmtN(c.enCamino)} pedidos en camino</b> que ya tienen su publicidad gastada y aún no suman ganancia. Si se entregaran todos, el costo por entrega bajaría a <b>{cop(c.mejorCaso)}</b>{c.gananciaPorPedido != null ? ` y te quedarían ${cop(c.gananciaPorPedido - c.mejorCaso)} por pedido` : ''}. Es el mejor caso: las devoluciones lo empeoran.</div>}
-        </div>
-      )}
-      <div className="kpis">
-        <Kpi l="Pedidos vendidos" v={fmtN(c.ventas)} nota={`${fmtN(c.entregados)} entregados · ${fmtN(c.enCamino)} en camino`} />
-        <Kpi ayuda="cpa" l="Costo por pedido entregado" v={c.cpaEntrega == null ? '—' : cop(c.cpaEntrega)} nota={c.cpaEntrega == null ? 'sin gasto de publicidad' : `${cop(c.gasto)} de publicidad (con IVA) entre ${fmtN(c.entregados)} entregados`} />
-        <Kpi l="Costo por pedido vendido" v={c.costoPorPedido == null ? '—' : cop(c.costoPorPedido)} nota={`${cop(c.gasto)} entre ${fmtN(c.ventas)} pedidos vendidos`} />
-        <Kpi l="Ganancia por pedido" v={c.gananciaPorPedido == null ? '—' : cop(c.gananciaPorPedido)} nota={`promedio real de ${fmtN(c.pagados)} pedidos ya pagados`} color="jade-ink" />
-        <Kpi l="Te queda por pedido entregado" v={c.quedaPorEntrega == null ? '—' : cop(c.quedaPorEntrega)} nota="ganancia − costo de la publicidad" color={c.quedaPorEntrega != null ? (c.quedaPorEntrega >= 0 ? 'jade-ink' : 'coral-ink') : undefined} />
-      </div>
-      <p className="muted only-learner" style={{ fontSize: 13.5, margin: '14px 0 0' }}>La publicidad es la que Meta gastó (con IVA) desde el inicio de tu operación. El costo por pedido <b>entregado</b> es el de una venta que sí se cobró; el costo por pedido <b>vendido</b> incluye los que aún van en camino. Mientras haya muchos pedidos en camino, el costo por entrega se ve alto: baja cuando se entregan. Mide períodos largos, no un solo día.</p>
-    </>
-  )
-}
-
-/* ---------- A dónde va mi plata ---------- */
-const COLORES = ['#3B82F6', '#94A3B8', '#EF4444', '#F59E0B', '#0F172A', '#8B5CF6']
-export function VistaDondeVaMiPlata({ d }) {
-  if (!d.dias.length) return <Aviso tono="blue" titulo="Aún no hay datos">Sincroniza tu billetera y tu tarjeta en Mis cuentas → Dropi.</Aviso>
-  const r = d.resumen, filas = repartoDeCostos(costosDelDia(r.total, r.herramientas), r.total.ganancia)
-  const total = filas.reduce((a, f) => a + f.monto, 0)
-  return (
-    <>
-      <div className="kpis" style={{ marginBottom: 16 }}>
-        <Kpi l="Te entró (ganancias de pedidos)" v={cop(r.total.ganancia)} color="jade-ink" />
-        <Kpi l="Se fue en costos" v={cop(total)} color="coral-ink" />
-        <Kpi l={r.neto >= 0 ? 'Te quedó' : 'Perdiste'} v={cop(r.neto)} color={r.neto >= 0 ? 'jade-ink' : 'coral-ink'} />
-      </div>
-      {!d.hayCobros && <Aviso titulo="Sin cobros de Meta cargados">La publicidad aparece dentro de «otros gastos de la tarjeta». Cuando se conecte Meta se separa.</Aviso>}
-      <div className="card">
-        <h2 style={{ marginBottom: 14 }}>En qué se fue cada peso</h2>
-        <div style={{ display: 'flex', height: 34, borderRadius: 8, overflow: 'hidden' }} role="img" aria-label="Reparto de los costos">
-          {filas.map((f, i) => <div key={f.nombre} title={`${f.nombre}: ${cop(f.monto)}`} style={{ width: `${(f.monto / (total || 1)) * 100}%`, background: COLORES[i % COLORES.length], color: '#fff', fontSize: 12, fontWeight: 700, display: 'grid', placeItems: 'center', overflow: 'hidden', whiteSpace: 'nowrap' }}>{f.pctDelCosto >= 9 ? `${f.pctDelCosto}%` : ''}</div>)}
-        </div>
-        <div style={{ marginTop: 14 }}>
-          {filas.map((f, i) => (
-            <div key={f.nombre} className="rowline" style={{ alignItems: 'center' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><i style={{ width: 10, height: 10, borderRadius: 3, background: COLORES[i % COLORES.length] }} />{f.nombre}</span>
-              <span style={{ display: 'inline-flex', gap: 16, alignItems: 'baseline' }}>
-                <span className="muted" style={{ fontSize: 13 }}>{f.pctDelCosto} % de los costos{f.pctDeLaGanancia != null ? ` · ${f.pctDeLaGanancia} % de tu ganancia` : ''}</span>
-                <b className="num">{cop(f.monto)}</b>
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
     </>
   )
 }
@@ -339,7 +203,7 @@ export function VistaCuandoRecupero({ d }) {
         </div>
       </div>
       <div className="kpis" style={{ marginBottom: 16 }}>
-        <Kpi ayuda="recuperacion" l="Te faltan" v={cop(falta)} nota={`invertiste ${cop(rec.invertido)} · recuperaste ${cop(rec.recuperado)}`} color={ya ? 'jade-ink' : 'gold-ink'} />
+        <Kpi ayuda="recuperacion" l="Te faltan" v={cop(falta)} nota={`gastaste ${cop(rec.invertido)} · entró ${cop(rec.recuperado)}`} color={ya ? 'jade-ink' : 'gold-ink'} />
         <Kpi ayuda="sin_pagar" l="Entregados sin pagar" v={fmtN(sin)} nota={g && sin ? `≈ ${cop(sin * g)} que Dropi te debe` : 'ya entregados, esperando el pago'} color={sin ? 'gold-ink' : undefined} />
         <Kpi ayuda="en_curso" l="En camino o pendientes" v={fmtN(curso)} nota={g && curso ? `≈ ${cop(Math.round(curso * g * (proy ? proy.tasaBase : 1)))} si se entrega el ${proy ? Math.round(proy.tasaBase * 100) : 100} %` : 'su ganancia aún no cuenta'} />
         <Kpi l="Ya pagados" v={fmtN(c.pagado || 0)} nota="la ganancia ya está en tu billetera" color="jade-ink" />

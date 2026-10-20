@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Icono } from '@/components/shell/Icono'
 import { fmtN } from '@/lib/formato'
 import ResultadoCampana from '@/components/ResultadoCampana'
+import Ayuda from '@/components/Ayuda'
 
 // Campañas: cada una agrupa productos de Dropi. Los pedidos se atribuyen por producto; la ganancia y las devoluciones son lo real de tu billetera.
 async function api(method, url, body) {
@@ -37,11 +38,13 @@ function SelectorProductos({ productos, valor, onChange, propia }) {
 function FormularioCampana({ productos, inicial, onGuardar, onCancelar, etiqueta }) {
   const [nombre, setNombre] = useState(inicial ? inicial.nombre : '')
   const [ids, setIds] = useState(inicial ? inicial.productIds : [])
+  const [dev, setDev] = useState(inicial && inicial.devolucionPct != null ? String(inicial.devolucionPct) : '15')
+  const devOk = dev !== '' && Number(dev) >= 0 && Number(dev) <= 100
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
   async function enviar(e) {
     e.preventDefault(); setError(''); setEnviando(true)
-    try { await onGuardar({ nombre, productIds: ids }) } catch (ex) { setError(ex.message); setEnviando(false) }
+    try { await onGuardar({ nombre, productIds: ids, devolucionPct: Number(dev) }) } catch (ex) { setError(ex.message); setEnviando(false) }
   }
   return (
     <form onSubmit={enviar} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -49,9 +52,13 @@ function FormularioCampana({ productos, inicial, onGuardar, onCancelar, etiqueta
       <div className="field"><label>Productos de esta campaña</label>
         <SelectorProductos productos={productos} valor={ids} onChange={setIds} propia={inicial && inicial.nombre} />
       </div>
+      <div className="field" style={{ maxWidth: 260 }}>
+        <label htmlFor="c-dev">Devolución esperada (%)<Ayuda t="devolucion_esperada" /></label>
+        <div className="inp"><input id="c-dev" type="number" min={0} max={100} step="0.5" inputMode="decimal" value={dev} onChange={(e) => setDev(e.target.value)} style={{ fontSize: 16 }} /><span className="muted" style={{ fontSize: 13 }}>%</span></div>
+      </div>
       {error && <span className="errm" role="alert">{error}</span>}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <button className="btn" type="submit" disabled={enviando || !nombre.trim() || !ids.length}>{etiqueta}</button>
+        <button className="btn" type="submit" disabled={enviando || !nombre.trim() || !ids.length || !devOk}>{etiqueta}</button>
         <button className="btn ghost" type="button" onClick={onCancelar}>Cancelar</button>
       </div>
     </form>
@@ -71,9 +78,9 @@ function Tarjeta({ c, productos, onCambio }) {
         <button className="btn ghost sm" aria-expanded={editando} onClick={() => setEditando((v) => !v)}>Editar</button>
         <button className="iconbtn" style={{ width: 36, height: 36, borderRadius: 9 }} aria-label={`Eliminar ${c.nombre}`} title="Eliminar" onClick={() => onCambio(c.id, null)}><Icono n="trash" size={16} /></button>
       </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{c.productos.map((p) => <span key={p.id} className="chip idle">{p.nombre}</span>)}</div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{c.productos.map((p) => <span key={p.id} className="chip idle">{p.nombre}</span>)}<span className="chip blue" title="Devolución que esperas de esta campaña: se usa para estimar la ganancia de los pedidos en curso">Devolución esperada {c.devolucionPct} %</span></div>
       {editando
-        ? <div style={{ marginTop: 14 }}><FormularioCampana productos={productos} inicial={{ nombre: c.nombre, productIds: c.productIds }} etiqueta="Guardar cambios" onCancelar={() => setEditando(false)} onGuardar={async (v) => { await onCambio(c.id, v); setEditando(false) }} /></div>
+        ? <div style={{ marginTop: 14 }}><FormularioCampana productos={productos} inicial={{ nombre: c.nombre, productIds: c.productIds, devolucionPct: c.devolucionPct }} etiqueta="Guardar cambios" onCancelar={() => setEditando(false)} onGuardar={async (v) => { await onCambio(c.id, v); setEditando(false) }} /></div>
         : <ResultadoCampana r={c.r} gasto={c.gasto} />}
     </div>
   )
