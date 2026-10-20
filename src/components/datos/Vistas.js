@@ -117,7 +117,7 @@ function TarjetaRecuperacion({ rec, enCamino, vacio }) {
       <div style={{ height: 18, borderRadius: 999, background: '#E2E8F0', overflow: 'hidden' }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={rec.pct ?? 0} aria-label="Inversión recuperada">
         <div style={{ width: `${Math.max(rec.pct ?? 0, rec.pct ? 2 : 0)}%`, height: '100%', background: color, borderRadius: 999, transition: 'width .4s' }} />
       </div>
-      <div style={{ display: 'flex', gap: '10px 34px', flexWrap: 'wrap', marginTop: 16 }}>
+      <div className="rec-nums" style={{ display: 'flex', gap: '10px 34px', flexWrap: 'wrap', marginTop: 16 }}>
         <div><div className="muted" style={{ fontSize: 13 }}>Gastaste en total<Ayuda t="invertido" /></div><div className="num" style={{ fontSize: 22, fontWeight: 700 }}>{cop(rec.invertido)}</div></div>
         <div><div className="muted" style={{ fontSize: 13 }}>Entró en total<Ayuda t="recuperado" /></div><div className="num" style={{ fontSize: 22, fontWeight: 700, color: 'var(--jade-ink)' }}>{cop(rec.recuperado)}</div></div>
         <div><div className="muted" style={{ fontSize: 13 }}>{ok ? 'Ganancia después de recuperar' : 'Te faltan'}</div><div className="num" style={{ fontSize: 22, fontWeight: 700, color: ok ? 'var(--jade-ink)' : ink }}>{cop(ok ? rec.excedente : rec.faltan)}</div></div>
@@ -127,7 +127,7 @@ function TarjetaRecuperacion({ rec, enCamino, vacio }) {
         {rec.estado === 'en_camino' && <>Al ritmo de la última semana te quedan <b>{cop(rec.ritmo)} por día</b>: lo recuperas en unos <b>{rec.dias} {rec.dias === 1 ? 'día' : 'días'}</b>, hacia el <b>{fecha}</b>.</>}
         {mal && <>Con el ritmo de la última semana <b>todavía no se recupera</b>: estás gastando {cop(-rec.ritmo)} más por día de lo que entra. Revisa en qué se va la plata y qué campañas no están dejando.</>}
       </div>
-      <p className="muted only-learner" style={{ fontSize: 13, margin: '12px 0 0' }}>
+      <p className="muted only-learner m-oculto" style={{ fontSize: 13, margin: '12px 0 0' }}>
         <b>Gastaste en total</b> = publicidad, devoluciones, comisiones, otros gastos de la tarjeta y herramientas, desde el {diaCorto(rec.desde)}. <b>Entró en total</b> = ganancias de pedidos entregados que ya entraron a tu billetera. Recuperas tu inversión cuando lo que entró iguala lo que gastaste.
         {enCamino.n > 0 && <> Además hay {fmtN(enCamino.n)} {enCamino.n === 1 ? 'pedido' : 'pedidos'} en camino por {cop(enCamino.valor)} en total: su ganancia todavía no cuenta.</>}
       </p>
@@ -157,10 +157,14 @@ export function VistaDashboard({ d }) {
   const actual = base.cortes.find((c) => c.abierto) || base.cortes[0]
   return (
     <>
-      {!vacio && <PanelSalud s={base.salud} ritmo={base.ritmoPauta} titulo="1 · ¿Cuánto puedo retirar hoy?" />}
-      {!vacio && actual && <ResumenPeriodo c={actual} per={{ tipo: 'corte', id: actual.id, abierto: actual.abierto }} hoy={base.hoy} titulo="2 · ¿Cómo voy en este corte?" enlace={{ href: '/contabilidad', texto: 'Ver el detalle del dinero' }} />}
+      {/* Los cuatro títulos van fuera de las tarjetas, con el mismo estilo: así se leen como una secuencia. */}
+      {!vacio && <div className="sec-head" style={{ margin: '0 0 12px' }}><h2>1 · ¿Cuánto puedo retirar hoy? <Ayuda t="salud_billetera" /></h2></div>}
+      {!vacio && <PanelSalud s={base.salud} origen={base.origen} inicio={base.inicio} hoy={base.hoy} ritmo={base.ritmoPauta} titulo={null} />}
 
-      <div className="sec-head" style={{ margin: '0 0 12px' }}><h2>3 · ¿Cuándo recupero mi inversión?</h2></div>
+      {!vacio && actual && <div className="sec-head" style={{ margin: '26px 0 12px' }}><h2>2 · ¿Cómo voy en este corte?</h2></div>}
+      {!vacio && actual && <ResumenPeriodo c={actual} per={{ tipo: 'corte', id: actual.id, abierto: actual.abierto }} hoy={base.hoy} enlace={{ href: '/contabilidad', texto: 'Ver el detalle del dinero' }} />}
+
+      <div className="sec-head" style={{ margin: vacio ? '0 0 12px' : '6px 0 12px' }}><h2>3 · ¿Cuándo recupero mi inversión?</h2></div>
       <TarjetaRecuperacion rec={d.rec} enCamino={d.enCamino} vacio={vacio} />
       {!vacio && <div style={{ marginTop: 16 }}><GraficaAcumulado serie={d.ganancia.serie} /></div>}
 
@@ -301,7 +305,7 @@ export function VistaEscalar({ e, nombre, vinculada }) {
         <div style={{ fontSize: 14.5, marginTop: 4 }}>
           {e.veredicto === 'escalar' && <>Pasa de {cop(Math.round(e.presupuesto))} a <b>{cop(Math.round(e.nuevoPresupuesto))}</b> por día (sin IVA) y espera <b>3 días</b> antes de volver a subir. Si el costo por venta se dispara, vuelve al presupuesto anterior.</>}
           {e.veredicto === 'vigilar' && <>Falta: {fallan.map((c) => c.texto.split(':')[0].toLowerCase()).join('; ')}. No subas el presupuesto todavía.</>}
-          {e.veredicto === 'pausar' && <>Por cada $1 que pones, recuperas ${e.roasPrudente.toFixed(2)} de ganancia (con entrega prudente): estás perdiendo plata. Revisa el anuncio o el producto antes de gastar más.</>}
+          {e.veredicto === 'pausar' && <>Por cada $1 que pones, recuperas ${e.roasPrudente.toFixed(2).replace('.', ',')} de ganancia (con entrega prudente): estás perdiendo plata. Revisa el anuncio o el producto antes de gastar más.</>}
         </div>
       </div>
       <div className="kpis" style={{ marginBottom: 16 }}>

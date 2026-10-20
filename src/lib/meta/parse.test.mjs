@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseInsights, parseTransacciones, estadoCobro, referenciaDe, diaDeInstante, ventanaMeta } from './parse.mjs'
+import { parseInsights, parseInsightsAnuncios, parseTransacciones, estadoCobro, referenciaDe, diaDeInstante, ventanaMeta } from './parse.mjs'
 import { rutaMetaPermitida, cuentaMeta } from './rutas.mjs'
 
 test('insights: gasto, clics y compras por campaña y día', () => {
@@ -42,4 +42,13 @@ test('ventana de Meta: desde el inicio; después, 7 días antes de la última si
   assert.deepEqual(ventanaMeta({ hoy: '2026-10-10', inicio: '2026-09-21', ultimaSyncDia: null }), { from: '2026-09-21', to: '2026-10-10' })
   assert.deepEqual(ventanaMeta({ hoy: '2026-10-10', inicio: '2026-09-21', ultimaSyncDia: '2026-10-09' }), { from: '2026-10-02', to: '2026-10-10' })
   assert.equal(ventanaMeta({ hoy: '2026-10-10', inicio: '2026-09-21', ultimaSyncDia: '2026-09-23' }).from, '2026-09-21') // nunca antes del inicio
+})
+
+test('insights por anuncio: gasto, clics y compras por anuncio y día', () => {
+  const r = parseInsightsAnuncios([
+    { ad_id: '2300', ad_name: 'MASAJEADOR_DOLOR-CUELLO_VID_V01_20261019', campaign_id: '1200', date_start: '2026-10-20', spend: '30000.5', impressions: '4000', clicks: '90', actions: [{ action_type: 'omni_purchase', value: '2' }], action_values: [{ action_type: 'omni_purchase', value: '180000' }] },
+    { ad_id: 'x', date_start: '2026-10-20', spend: '1' }, // sin ID válido
+    { ad_id: '2400', date_start: 'ayer', spend: '1' }, // sin fecha válida
+  ])
+  assert.deepEqual(r, [{ day: '2026-10-20', adId: '2300', adName: 'MASAJEADOR_DOLOR-CUELLO_VID_V01_20261019', campaignId: '1200', spend: 30000.5, impressions: 4000, clicks: 90, purchases: 2, purchaseValue: 180000 }])
 })

@@ -45,7 +45,7 @@ export function TablaTarjeta({ lista }) {
         columnas={[
           { titulo: 'Fecha', izq: true, celda: (f) => diaCorto(f.fecha) },
           { titulo: 'Descripción', txt: true, celda: (f) => f.descripcion || '—' },
-          { titulo: 'Referencia', txt: true, celda: (f) => f.refPago || '—' },
+          { titulo: 'Referencia', txt: true, m: true, celda: (f) => f.refPago || '—' },
           { titulo: 'Valor', celda: (f) => <span style={tachado(f)}>{f.clase === 'recarga' ? '+' : '−'}{cop(f.monto)}</span> },
           { titulo: 'Qué es', izq: true, celda: (f) => <Chip t={CLASE[f.clase][0]}>{CLASE[f.clase][1]}</Chip> },
           { titulo: 'Contabilidad', izq: true, celda: (f) => <button className="link" disabled={ocupado} onClick={() => cambiar([f.id], f.clase !== 'ignorado')}>{f.clase === 'ignorado' ? 'Volver a contar' : 'No contar'}</button> },
@@ -71,7 +71,7 @@ export function TablaBilletera({ mov }) {
         { titulo: 'Qué fue', izq: true, celda: (f) => <Chip t={WK[f.estado][0]}>{WK[f.estado][1]}</Chip> },
         { titulo: 'Detalle', txt: true, celda: (f) => (f.estado === 'profit' ? `Pedido #${f.order_ref || '—'}` : f.description || '') },
         { titulo: 'Valor', celda: (f) => <>{f.direction === 'in' ? '+' : '−'}{cop(f.amount)}</> },
-        { titulo: 'Saldo después', celda: (f) => (f.despues == null ? '—' : cop(f.despues)) },
+        { titulo: 'Saldo después', m: true, celda: (f) => (f.despues == null ? '—' : cop(f.despues)) },
       ]} />
   )
 }
@@ -87,9 +87,9 @@ export function TablaPedidos({ lista, ocultarCampana = false }) {
       columnas={[
         { titulo: 'Creado', izq: true, celda: (f) => diaCorto(f.creado) },
         { titulo: 'Pedido (ID Dropi)', txt: true, celda: (f) => <><b style={{ color: 'var(--ink)' }}>#{f.idPedido}</b>{f.guia ? ` · guía ${f.guia}` : ''}</> },
-        { titulo: 'Producto', txt: true, celda: (f) => f.producto || '—' },
-        ...(ocultarCampana ? [] : [{ titulo: 'Campaña', txt: true, celda: (f) => f.campana || <span className="muted">sin campaña</span> }]),
-        { titulo: 'Estado en Dropi', txt: true, celda: (f) => f.estadoDropi || '' },
+        { titulo: 'Producto', txt: true, m: true, celda: (f) => f.producto || '—' },
+        ...(ocultarCampana ? [] : [{ titulo: 'Campaña', txt: true, m: true, celda: (f) => f.campana || <span className="muted">sin campaña</span> }]),
+        { titulo: 'Estado en Dropi', txt: true, m: true, celda: (f) => f.estadoDropi || '' },
         { titulo: 'Total', celda: (f) => (f.total == null ? '—' : cop(f.total)) },
         { titulo: 'Contabilidad', izq: true, celda: (f) => <Chip t={CONTABLE[f.contable][0]}>{CONTABLE[f.contable][1]}{f.contable === 'sin_pagar' ? ` · ${f.dias} d` : ''}</Chip> },
       ]} />

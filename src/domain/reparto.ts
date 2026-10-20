@@ -1,18 +1,18 @@
 // Reparto de la UTILIDAD. Orden: 1) los ingresos de la billetera (lo que Dropi paga) cubren primero los gastos REALES (publicidad, devoluciones, comisiones, herramientas): lo que queda es la utilidad neta.
 // 2) La billetera debe conservar un piso de liquidez (publicidad de 7 días con el ritmo real de Meta + su deuda + costo esperado de devoluciones). 3) La utilidad se divide con los porcentajes:
-// los destinos que se quedan en la operación (reinversión extra, reserva, ahorro, impuestos) y, al final, las socias, que es lo único que se retira. salud.ts calcula cuánto se puede retirar y cuándo.
+// los destinos que se quedan en la operación (reinversión extra, reserva, ahorro, impuestos) y, al final, los socios, que es lo único que se retira. salud.ts calcula cuánto se puede retirar y cuándo.
 export type TipoDestino = "pauta" | "reserva" | "ahorro" | "impuestos" | "socio" | "otro";
 export type Destino = { id: string; nombre: string; pct: number; tipo: TipoDestino };
 export const TIPOS: Record<TipoDestino, string> = { pauta: "Reinversión extra en pauta", reserva: "Reserva", ahorro: "Ahorro", impuestos: "Impuestos", socio: "Socio/a (se retira)", otro: "Otro" };
 
-// Punto de partida para una operación que aún crece (dos socias): la mitad de la utilidad se queda en la operación (reinversión extra, imprevistos, ahorro e impuestos) y la otra mitad es de las socias.
+// Punto de partida para una operación que aún crece (dos socios): la mitad de la utilidad se queda en la operación (reinversión extra, imprevistos, ahorro e impuestos) y la otra mitad es de los socios.
 export const REPARTO_DEFECTO: Destino[] = [
   { id: "pauta", nombre: "Reinversión extra en pauta", pct: 25, tipo: "pauta" },
   { id: "reserva", nombre: "Reserva de imprevistos", pct: 10, tipo: "reserva" },
   { id: "ahorro", nombre: "Ahorro", pct: 10, tipo: "ahorro" },
   { id: "impuestos", nombre: "Impuestos", pct: 5, tipo: "impuestos" },
-  { id: "socio1", nombre: "Socia 1", pct: 25, tipo: "socio" },
-  { id: "socio2", nombre: "Socia 2", pct: 25, tipo: "socio" },
+  { id: "socio1", nombre: "Socio 1", pct: 25, tipo: "socio" },
+  { id: "socio2", nombre: "Socio 2", pct: 25, tipo: "socio" },
 ];
 
 /** Valida un plan de reparto. Devuelve el mensaje de error o null si está bien. */

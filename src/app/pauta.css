@@ -168,7 +168,7 @@ body[data-level="learner"] .only-pro{display:none!important}
 .inp{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line2);border-radius:10px;padding:0 14px;transition:box-shadow .15s,border-color .15s}
 .inp:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(11,95,255,.14)}
 .inp input,.inp textarea{flex:1;min-width:0;border:0;background:transparent;font-family:var(--mono);font-size:18px;font-weight:600;padding:12px 0;outline:none;font-variant-numeric:tabular-nums}
-.inp input[type=search],.inp input[type=text]:not([data-num]){font-family:var(--sans);font-weight:500;font-size:16px}
+.inp input[type=search],.inp input[type=text]:not([data-num]),.inp input:not([type]),.inp input[type=url],.inp input[type=date],.inp input[type=email]{font-family:var(--sans);font-weight:500;font-size:16px}
 .inp textarea{font-family:var(--sans);font-size:15px;font-weight:400;resize:none;line-height:1.5;padding:12px 0}
 .inp .pre{color:var(--muted);font-weight:600;font-family:var(--mono)}
 .inp.err{border-color:var(--coral);box-shadow:0 0 0 3px rgba(239,68,68,.12)}
@@ -696,7 +696,7 @@ a.ni{text-decoration:none}
 .ayuda{position:relative;display:inline-flex;vertical-align:middle;margin-left:6px}
 .ayuda-btn{width:20px;height:20px;border-radius:50%;border:1px solid var(--line2);background:var(--panel);color:#64748B;font:700 12px var(--sans);display:grid;place-items:center;cursor:pointer;padding:0;line-height:1}
 .ayuda-btn:hover,.ayuda-btn[aria-expanded="true"]{background:var(--blue-soft);color:var(--blue);border-color:var(--blue-line)}
-.ayuda-pop{position:absolute;z-index:40;top:26px;left:-8px;width:min(320px,80vw);display:flex;flex-direction:column;gap:6px;background:#0F172A;color:#fff;border-radius:14px;padding:14px 16px;font:500 13.5px/1.45 var(--sans);box-shadow:0 12px 32px rgba(15,23,42,.28);text-align:left;font-weight:500}
+.ayuda-pop{white-space:normal;overflow-wrap:anywhere;position:absolute;z-index:40;top:26px;left:-8px;width:min(320px,80vw);display:flex;flex-direction:column;gap:6px;background:#0F172A;color:#fff;border-radius:14px;padding:14px 16px;font:500 13.5px/1.45 var(--sans);box-shadow:0 12px 32px rgba(15,23,42,.28);text-align:left;font-weight:500}
 .ayuda-pop b{font-weight:700}
 .ayuda-pop .ayuda-f{opacity:.8;font-size:12.5px}
 .ayuda-pop .link{color:#93C5FD;font-weight:600}
@@ -744,3 +744,225 @@ details.vz-det>summary{cursor:pointer;font-weight:600;font-size:14.5px;color:var
 details.vz-det>summary::-webkit-details-marker{display:none}
 details.vz-det>summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
 details.vz-det[open]>summary::before{content:"▾ "}
+
+/* ---------- Asistente de IA flotante ---------- */
+.ia-fab{position:fixed;right:22px;bottom:22px;z-index:900;width:56px;height:56px;border-radius:50%;border:0;background:var(--blue);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 28px rgba(11,95,255,.35),0 2px 6px rgba(15,23,42,.2);transition:transform .15s}
+.ia-fab:hover{transform:scale(1.06)}.ia-fab:focus-visible{outline:3px solid var(--blue-line);outline-offset:2px}
+.ia-panel{position:fixed;right:22px;bottom:90px;z-index:900;width:min(420px,calc(100vw - 24px));height:min(640px,calc(100vh - 120px));display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line2);border-radius:18px;box-shadow:0 20px 56px rgba(15,23,42,.26);overflow:hidden}
+.ia-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.ia-msgs{flex:1;overflow:auto;padding:14px;display:grid;align-content:start;gap:12px}
+.ia-yo{justify-self:end;max-width:88%;background:var(--blue-soft);border:1px solid var(--blue-line);border-radius:14px;padding:9px 13px;font-size:14px}
+.ia-form{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel)}
+.ia-msgs .card{box-shadow:none}
+/* en el celular el menú está abajo: el botón y la ventana van por encima de él y con borde blanco para que se distingan */
+@media (max-width:900px){.ia-fab{right:14px;bottom:calc(88px + env(safe-area-inset-bottom,0px));box-shadow:0 0 0 3px #fff,0 10px 28px rgba(11,95,255,.4),0 2px 6px rgba(15,23,42,.2)}.ia-panel{right:8px;left:8px;width:auto;bottom:calc(156px + env(safe-area-inset-bottom,0px));height:calc(100dvh - 190px - env(safe-area-inset-bottom,0px))}}
+/* ---------- Salud de la billetera: monto grande, billetera visible, lo que les toca y tarjetas por socio ---------- */
+.sal-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:12px;margin-top:12px}
+.sal-tile{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:var(--panel)}
+.sal-main{background:var(--surface)}
+.sal-prog{display:flex;gap:3px;height:16px;border-radius:999px;overflow:hidden;margin-top:6px}
+.sal-prog>div{min-width:6px}
+.sal-prog-l{display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;font-size:14px;margin-top:8px}
+.sal-prog-l i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.sal-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.sal-mini{border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:grid;gap:2px}
+.sal-mini b{font-family:var(--mono);font-size:21px;letter-spacing:-.01em}
+.sal-proy{background:var(--gold-soft);border-color:var(--gold-line)}
+.sal-eq{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin-top:10px}
+.sal-eq>i{align-self:center;font-style:normal;font-size:22px;font-weight:700;color:var(--muted)}
+.sal-eq-b{flex:1 1 150px;border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:grid;gap:2px;background:var(--panel)}
+.sal-eq-b span{font-size:12.5px;color:var(--muted);font-weight:600}
+.sal-eq-b b{font-family:var(--mono);font-size:20px}
+.sal-eq-ok{background:var(--jade-soft);border-color:var(--jade-line)}
+.sal-piso{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.sal-piso li{display:flex;gap:10px;align-items:flex-start}
+.sal-piso li>i{flex:none;width:12px;height:12px;border-radius:4px;margin-top:5px}
+.sal-piso li span{display:grid;font-size:14px}.sal-piso li em{font-style:normal;color:var(--muted);font-size:13px}
+@media (max-width:720px){.sal-eq>i{display:none}}
+/* La ayuda dentro de una etiqueta se ancla a la etiqueta (no al «?»), para que el globo no se salga de la pantalla */
+.sal-prog-l .chip{position:relative}
+.sal-prog-l .chip .ayuda{position:static}
+.sal-prog-l .chip .ayuda-pop{left:0;top:calc(100% + 6px)}
+.sal-lim{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+.sal-lim-i{border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:grid;gap:2px}
+.sal-lim-i span{font-size:13px;color:var(--muted);font-weight:600}.sal-lim-i b{font-family:var(--mono);font-size:19px}
+.sal-lim-i.on{border-color:var(--jade);background:var(--jade-soft)}.sal-lim-i em{font-style:normal;font-size:12.5px;font-weight:700;color:var(--jade-ink)}
+.sal-pasos{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:18px}
+.sal-pasos>li{border-left:3px solid var(--line2);padding-left:14px}
+.sal-pasos h4{margin:0 0 4px;font-size:15.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sal-pasos h4 i{width:22px;height:22px;border-radius:999px;background:var(--blue);color:#fff;font-style:normal;font-size:12.5px;font-weight:800;display:grid;place-items:center}
+.sal-pasos h4 span{font-weight:500;font-size:13px;color:var(--muted)}
+.sal-pasos .muted{font-size:13.5px;margin:8px 0 0}
+.sal-cta{display:grid;margin-top:6px}
+.sal-cta-f{display:flex;justify-content:space-between;gap:16px;align-items:baseline;padding:8px 2px;border-bottom:1px dashed var(--line2);font-size:14.5px}
+.sal-cta-f span{display:grid;gap:1px;min-width:0}.sal-cta-f small{font-size:12.5px;color:var(--muted);font-weight:500}
+.sal-cta-f em{font-style:normal;color:var(--muted);margin-right:4px}
+.sal-cta-f .v{font-family:var(--mono);white-space:nowrap}
+.sal-cta-f.tot{border-bottom:0;border-top:2px solid var(--ink);margin-top:2px;padding-top:10px;font-size:16px}
+.sal-cta-f.tot .v{font-size:18px;color:var(--jade-ink)}
+.sal-rango{background:var(--blue-soft);border:1px solid var(--blue-line);border-radius:12px;padding:9px 14px;font-size:13.5px;margin-top:10px}
+.sal-pasos>li{border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:14px;padding:14px 16px;background:var(--surface)}
+.sal-eq-b small{font-size:12px;color:var(--muted)}
+.sal-fin{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;padding:12px 16px;border-radius:12px;background:var(--jade-soft);border:1px solid var(--jade-line)}
+.sal-fin span{font-weight:700}.sal-fin b{font-family:var(--mono);font-size:26px;color:var(--jade-ink)}
+
+/* ---------- Pasos de «¿Por qué este monto?» y leyendas plegables ---------- */
+.sal-paso>summary{list-style:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:15.5px;font-weight:700;margin:0 0 4px;cursor:default;pointer-events:none}
+.sal-paso>summary::-webkit-details-marker{display:none}
+.sal-paso>summary>i{flex:none;width:22px;height:22px;border-radius:999px;background:var(--blue);color:#fff;font-style:normal;font-size:12.5px;font-weight:800;display:grid;place-items:center}
+.sal-paso-n{font-weight:500;font-size:13px;color:var(--muted)}
+.sal-paso-r{display:none}
+.sal-chk{position:absolute;opacity:0;pointer-events:none}
+.sal-sm{display:none}
+.fila-det{display:none}
+.cr-lista{display:none}
+.m-sm{display:none}
+.sal-leg-btn{display:none}
+
+/* ---------- Celular: lo principal primero, el detalle a un toque ---------- */
+@media (max-width:720px){
+  .sal-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .sal-grid:has(.sal-texto){grid-template-columns:1fr}
+  .sal-tile{padding:12px}
+  .sal-tile .vz-hero{font-size:26px!important;letter-spacing:-.02em}
+  .sal-dup{display:none}
+  .sal-prog-l{gap:6px 12px;font-size:13.5px}
+  .sal-cards{grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .sal-mini{padding:10px 12px}.sal-mini b{font-size:18px}
+  .sal-proy{grid-column:1/-1}
+  /* leyenda plegada tras un botón (sin JavaScript) */
+  /* plegada: solo los nombres de los colores (qué es cada uno); al abrir, también montos y porcentajes */
+  .sal-chk:not(:checked)~.vz-leg{gap:2px 14px;font-size:12.5px;margin-top:8px}
+  .sal-chk:not(:checked)~.vz-leg b,.sal-chk:not(:checked)~.vz-leg li>span{display:none}
+  .sal-leg-btn{display:inline-flex;align-items:center;min-height:44px;margin-top:2px;color:var(--blue);font-weight:600;font-size:14px;cursor:pointer}
+  .sal-leg-btn .b,.sal-chk:checked~.sal-leg-btn .a{display:none}
+  .sal-chk:checked~.sal-leg-btn .b{display:inline}
+  .sal-chk:focus-visible~.sal-leg-btn{outline:3px solid var(--blue-line);outline-offset:2px;border-radius:8px}
+  /* pasos como acordeón: título + resultado, el detalle al tocar */
+  .sal-pasos{gap:8px}
+  .sal-pasos>li{padding:2px 12px;border-left-width:3px;border-radius:12px}
+  .sal-paso>summary{pointer-events:auto;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"n t c" "n r c";gap:0 10px;align-items:center;min-height:56px;padding:8px 0;margin:0;font-size:15px;line-height:1.3}
+  .sal-paso>summary>i{grid-area:n}
+  .sal-paso-t{grid-area:t;min-width:0}
+  .sal-paso-n{display:none}
+  .sal-paso-r{grid-area:r;display:block;font-family:var(--mono);font-size:15px;color:var(--jade-ink)}
+  .sal-paso>summary::after{grid-area:c;content:"";width:8px;height:8px;border:solid var(--muted);border-width:0 2px 2px 0;transform:rotate(45deg);margin:0 4px 3px 2px;transition:transform .15s}
+  .sal-paso[open]>summary::after{transform:rotate(-135deg);margin-bottom:-2px}
+  .sal-paso[open]>summary .sal-paso-r{display:none}
+  .sal-lg{display:none}.sal-sm{display:inline}
+  .sal-lim-i span{flex:1 1 60%}
+  .sal-paso-c{padding:0 0 12px}
+  /* ecuaciones: filas (nombre … valor) en vez de tarjetas grandes apiladas */
+  .sal-eq{display:grid;gap:0;margin-top:2px}
+  .sal-eq>i{display:none}
+  .sal-eq-b{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:0 12px;flex:none;border:0;border-bottom:1px dashed var(--line2);border-radius:0;background:none;padding:9px 2px}
+  .sal-eq-b span{font-size:14px;font-weight:500;color:var(--ink)}
+  .sal-eq-b b{font-size:16px}
+  .sal-eq-b small{flex-basis:100%;font-size:12.5px;color:var(--muted)}
+  .sal-eq-ok{border-bottom:0;border-top:2px solid var(--ink);margin-top:2px;background:none}
+  .sal-eq-ok b{color:var(--jade-ink);font-size:18px}
+  .sal-lim{grid-template-columns:1fr;gap:0}
+  .sal-lim-i{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;border:0;border-bottom:1px dashed var(--line2);border-radius:0;padding:9px 2px}
+  .sal-lim-i em{flex-basis:100%}
+  .sal-lim-i.on{border-bottom:1px solid var(--jade);background:var(--jade-soft);border-radius:8px;padding:9px 10px}
+  .sal-fin b{font-size:22px}
+  .sal-piso li span{font-size:14px}
+  .sal-rango{font-size:13px}
+  /* ayudas «?»: hoja desde abajo (cómodo con el pulgar) y zona táctil de 44 px */
+  .ayuda-btn{position:relative}
+  .ayuda-btn::after{content:"";position:absolute;inset:-12px}
+  .ayuda-pop{position:fixed!important;left:12px!important;right:12px;bottom:12px;top:auto!important;width:auto!important;max-height:65vh;overflow:auto;z-index:1000;box-shadow:0 -8px 40px rgba(15,23,42,.35)}
+  .sal-prog-l .chip .ayuda-pop{left:12px!important}
+  /* tarjetas de cifras en 2 columnas y explicaciones largas fuera (siguen en el «?» de cada cifra) */
+  .vz-tiles{grid-template-columns:1fr 1fr;gap:8px}
+  .vz-tile{padding:12px}
+  .vz-tile .v{font-size:20px}
+  .vz-tile .n{font-size:12px}
+  .m-oculto{display:none!important}
+  .rec-nums{display:grid!important;grid-template-columns:1fr 1fr;gap:10px 14px!important}
+  .rec-nums>div:last-child{grid-column:1/-1}
+  /* barra superior en una sola fila */
+  .top{flex-wrap:nowrap;gap:8px;padding:8px 12px;margin:0 -16px 6px}
+  .top .spacer{flex:1}
+  .m-lg{display:none}.m-sm{display:inline}
+  .top .seg button{padding:9px 11px;font-size:13px;white-space:nowrap}
+  /* «A dónde va tu plata»: nombre y monto en una línea; el porcentaje, debajo y pequeño */
+  .rl-nota{flex-wrap:wrap;align-items:baseline!important;row-gap:2px}
+  .rl-nota>span:last-child{display:contents!important}
+  .rl-nota>span:first-child{order:1;flex:1 1 55%}
+  .rl-nota b.num{order:2}
+  .rl-nota .muted{order:3;flex:1 1 100%}
+  /* tabla de cortes: solo lo esencial en el celular (el resto está en «Ver informe») */
+  .tbl-cortes{min-width:0!important}
+  .tbl-cortes th:nth-child(2),.tbl-cortes td:nth-child(2),.tbl-cortes th:nth-child(3),.tbl-cortes td:nth-child(3){display:none}
+  .tbl-cortes .only-pro{display:none!important}
+  .tbl-cortes th,.tbl-cortes td{padding:12px 8px}
+  .tbl-cortes td:first-child,.tbl-cortes th:first-child{padding-left:12px}
+  .tbl-cortes .btn{padding:9px 10px;font-size:13px;white-space:nowrap}
+  .tbl-cortes td{white-space:normal}
+  .tbl-cortes th,.tbl-cortes td{padding:12px 6px}
+  .tbl-cortes .btn{padding:8px 9px;font-size:12.5px}
+  .tbl-card .scroll-x{margin:0 -8px}
+  /* campañas: cifras en una rejilla pareja de 2 columnas */
+  .rc-grid{display:grid!important;grid-template-columns:1fr 1fr;gap:14px 12px!important}
+  .rc-grid>*{min-width:0}
+  /* combos y escalar: solo lo esencial en el celular */
+  .tbl-combos th:nth-child(2),.tbl-combos td:nth-child(2),.tbl-combos th:nth-child(4),.tbl-combos td:nth-child(4),.tbl-combos th:nth-child(5),.tbl-combos td:nth-child(5),.tbl-combos th:nth-child(6),.tbl-combos td:nth-child(6){display:none}
+  .tbl-esc{min-width:0!important}
+  .tbl-esc td,.tbl-esc th{white-space:nowrap}
+  .tbl-esc .only-pro{display:none!important}
+  /* tablas: celdas más angostas para que quepan las columnas esenciales */
+  .tbl th,.tbl td{padding:11px 8px}
+  .tbl th:first-child,.tbl td:first-child{padding-left:12px}
+  .tbl th:last-child,.tbl td:last-child{padding-right:12px}
+  .tbl td:first-child{min-width:0}
+  .tbl td.txt{min-width:0;font-size:13px}
+  /* textos largos (descripciones, referencias): máximo 2 líneas, sin partirse letra por letra */
+  .tbl td.txt .clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;max-width:150px;line-height:1.35}
+  .tbl td.st .chip{max-width:110px;font-size:12.5px;padding:3px 8px}
+  .tbl th{font-size:12.5px}
+  .tbl td{font-size:13.5px}
+  /* detalle completo de una fila: se abre al tocar el texto y muestra todo lo que la tabla oculta en el celular */
+  .tbl td.txt .clamp{cursor:pointer}
+  .tbl td.txt .clamp.abierto{-webkit-line-clamp:unset;color:var(--ink)}
+  .fila-det{display:table-row}
+  .fila-det td{padding:10px 14px 14px!important;text-align:left!important;background:var(--panel);font-family:var(--sans)!important;white-space:normal}
+  .fila-det dl{margin:0;display:grid;gap:8px}
+  .fila-det dt{font-size:12px;color:var(--muted);font-weight:600}
+  .fila-det dd{margin:0;font-size:14px;overflow-wrap:anywhere;color:var(--ink)}
+  /* creativos: tarjetas en vez de tabla */
+  .cr-tabla{display:none}
+  .cr-lista{display:grid;gap:10px}
+  .cr-card{display:grid;gap:8px;padding:14px!important}
+  .cr-nombre{font-family:ui-monospace,monospace;font-size:12.5px;font-weight:700;overflow-wrap:anywhere;flex:1;min-width:0}
+  .cr-fila{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .cr-fila .sel{flex:1 1 140px;min-width:0}
+  .cr-datos{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+  .cr-datos dt{font-size:12px;color:var(--muted)}.cr-datos dd{margin:0;font-family:var(--mono);font-size:14.5px;font-weight:600}
+  .cr-por summary{font-size:13px;color:var(--muted);cursor:pointer;min-height:32px;display:flex;align-items:center}
+  .cr-card .iconbtn{flex:none}
+  .tbl-res th:nth-child(2),.tbl-res td:nth-child(2),.tbl-res th:nth-child(6),.tbl-res td:nth-child(6),.tbl-res th:nth-child(7),.tbl-res td:nth-child(7),.tbl-res th:nth-child(8),.tbl-res td:nth-child(8){display:none}
+  /* reparto: el nombre arriba y, debajo, tipo · % · quitar */
+  .rep-fila{grid-template-columns:1fr 92px 44px!important;gap:8px!important}
+  .rep-fila>.inp:first-child{grid-column:1/-1}
+  .rep-fila>.sel{min-width:0}
+  /* formularios: nada se sale de la tarjeta */
+  .field{min-width:0;max-width:100%!important;width:auto!important}
+  .field .inp,.field .sel,.field input,.field select{max-width:100%;min-width:0}
+  .field select{text-overflow:ellipsis}
+  form.card{min-width:0}
+}
+
+/* ---------- Formularios en diálogos: todo del mismo alto y alineado ---------- */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.fgrid>.full{grid-column:1/-1}
+.fgrid .inp,.fgrid .sel{width:100%;min-height:50px;box-sizing:border-box}
+.fgrid .sel{padding-top:0;padding-bottom:0}
+.field .hint{font-size:13px;color:var(--muted);line-height:1.4;font-weight:400}
+.fgrid .field{min-width:0}
+.fdet{border:1px solid var(--line);border-radius:12px;padding:0 14px;background:var(--panel)}
+.fdet>summary{cursor:pointer;font-weight:600;font-size:14px;min-height:46px;display:flex;align-items:center;color:var(--blue)}
+.fdet[open]{padding-bottom:14px}
+.fdet .fgrid{margin-top:4px}
+.fbar{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px}
+@media (max-width:560px){.fgrid{grid-template-columns:1fr}.fbar .btn{flex:1 1 auto}}

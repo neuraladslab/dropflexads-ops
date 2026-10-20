@@ -5,6 +5,7 @@ export const SECCIONES = [
   ] },
   { id: 'campanas', etiqueta: 'Campañas', items: [
     { href: '/campanas', icono: 'chart', titulo: 'Campañas', desc: 'Cada campaña con sus pedidos, creativos y cuándo escalar' },
+    { href: '/creativos', icono: 'eye', titulo: 'Creativos', desc: 'El nombre único de cada video o imagen (igual en Meta y en Drive), si circula o está apagado y cuál funciona o hay que refrescar' },
   ] },
   { id: 'dinero', etiqueta: 'Dinero', items: [
     { href: '/contabilidad', icono: 'coin', titulo: 'Contabilidad', desc: 'Lo que entra, lo que sale y cuánto puedes retirar, por corte', tabs: [
@@ -29,6 +30,7 @@ export const SECCIONES = [
       { slug: 'herramientas', titulo: 'Herramientas de operación' },
       { slug: 'corte', titulo: 'Corte del mes' },
       { slug: 'reparto', titulo: 'Reparto' },
+      { slug: 'ia', titulo: 'Inteligencia artificial' },
     ] },
   ] },
 ]

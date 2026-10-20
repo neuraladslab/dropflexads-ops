@@ -300,3 +300,44 @@ CREATE TABLE IF NOT EXISTS cut_closures (
   UNIQUE (owner_id, period_end, version)
 );
 CREATE INDEX IF NOT EXISTS idx_cut_closures_owner ON cut_closures (owner_id, period_end DESC, version DESC);
+
+-- ============================================================
+-- Creativos: cada pieza (video o imagen) con un nombre ÚNICO, igual en esta app, en Meta y en Drive. Solo se crean tablas; no se toca nada existente. Nunca se borran: se archivan.
+CREATE TABLE IF NOT EXISTS creatives (
+  id SERIAL PRIMARY KEY,
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL,
+  campaign_label VARCHAR(120) NOT NULL,          -- el nombre de la campaña al crear (el nombre del creativo no cambia aunque se renombre la campaña)
+  angle VARCHAR(60) NOT NULL,
+  format VARCHAR(10) NOT NULL CHECK (format IN ('video', 'imagen')),
+  version INTEGER NOT NULL CHECK (version BETWEEN 1 AND 99),
+  made_on DATE NOT NULL,                          -- fecha que lleva el nombre
+  name VARCHAR(160) NOT NULL,                     -- CAMPAÑA_ÁNGULO_FORMATO_V##_AAAAMMDD
+  status VARCHAR(12) NOT NULL DEFAULT 'pausado' CHECK (status IN ('pausado', 'circulando', 'apagado', 'archivado')),
+  status_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  drive_url TEXT,
+  hook TEXT,                                      -- el gancho o texto principal, para recordar de qué trataba
+  notes TEXT,
+  meta_ad_id VARCHAR(40),                         -- enlace manual con un anuncio de Meta cuyo nombre no coincide
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_creatives_name ON creatives (owner_id, upper(name));
+CREATE INDEX IF NOT EXISTS idx_creatives_owner ON creatives (owner_id, created_at DESC);
+
+-- Gasto y resultados diarios por ANUNCIO de Meta (insights nivel «ad», sin IVA). Sirve para saber qué creativo funciona.
+CREATE TABLE IF NOT EXISTS meta_ad_spend_daily (
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  meta_ad_id VARCHAR(40) NOT NULL,
+  ad_name VARCHAR(250),
+  meta_campaign_id VARCHAR(40),
+  spend NUMERIC(14,2) NOT NULL DEFAULT 0,
+  impressions BIGINT NOT NULL DEFAULT 0,
+  clicks BIGINT NOT NULL DEFAULT 0,
+  purchases INTEGER NOT NULL DEFAULT 0,
+  purchase_value NUMERIC(14,2) NOT NULL DEFAULT 0,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (owner_id, day, meta_ad_id)
+);
+CREATE INDEX IF NOT EXISTS idx_meta_ad_spend_owner_day ON meta_ad_spend_daily (owner_id, day DESC);

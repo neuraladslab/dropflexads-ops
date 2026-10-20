@@ -26,15 +26,20 @@ function Anotar({ onCerrar, onListo }) {
   return (
     <Dialogo etiqueta="Anotar un cobro de Meta" onCerrar={onCerrar}>
       <h2 style={{ marginTop: 0 }}>Anotar un cobro de Meta</h2>
-      <p className="muted" style={{ marginTop: 0 }}>Copia los datos de tu extracto de facturación. El importe es el que ves ahí (ya incluye IVA).</p>
-      <form onSubmit={guardar} style={{ display: 'grid', gap: 12 }}>
-        <label>Fecha<input type="date" value={f.date} max={todayCO()} onChange={set('date')} required /></label>
-        <label>Importe (con IVA, en pesos)<input inputMode="numeric" placeholder="52.267" value={f.amount} onChange={set('amount')} required /></label>
-        <label>Referencia de pago <span className="muted">(la de «FACEBK *PZ4XV8SWF4», letras y números)</span><input value={f.paymentRef} onChange={set('paymentRef')} placeholder="PZ4XV8SWF4" maxLength={24} /></label>
-        <label>Identificador de la transacción <span className="muted">(opcional)</span><input value={f.reference} onChange={set('reference')} placeholder="28990819463938228-28947602274926610" maxLength={80} /></label>
-        <label>Nota <span className="muted">(opcional)</span><input value={f.notes} onChange={set('notes')} maxLength={300} /></label>
-        {error && <div className="tint bad" role="alert"><b style={{ color: 'var(--coral-ink)' }}>{error}</b></div>}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}><button type="button" className="btn ghost" onClick={onCerrar}>Cancelar</button><button className="btn" disabled={ocupado}>{ocupado ? 'Guardando…' : 'Guardar cobro'}</button></div>
+      <p className="muted" style={{ marginTop: 0 }}>Copia los datos de tu extracto de facturación de Meta. El importe es el que ves ahí (ya incluye IVA).</p>
+      <form onSubmit={guardar} className="fgrid" style={{ minWidth: 'min(560px, 80vw)' }}>
+        <div className="field"><label htmlFor="cm-f">Fecha del cobro</label><div className="inp"><input id="cm-f" type="date" value={f.date} max={todayCO()} onChange={set('date')} required /></div></div>
+        <div className="field"><label htmlFor="cm-i">Importe (con IVA)</label><div className="inp"><span className="pre">$</span><input id="cm-i" data-num inputMode="numeric" autoComplete="off" placeholder="52.267" value={f.amount} onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 12); setF({ ...f, amount: d ? Number(d).toLocaleString('es-CO') : '' }) }} required /></div></div>
+        <div className="field full"><label htmlFor="cm-r">Referencia de pago</label><div className="inp"><input id="cm-r" type="text" value={f.paymentRef} onChange={(e) => setF({ ...f, paymentRef: e.target.value.toUpperCase() })} placeholder="PZ4XV8SWF4" maxLength={24} autoComplete="off" /></div><span className="hint">La que aparece en el extracto como «FACEBK *PZ4XV8SWF4»: letras y números. Sirve para cruzar el cobro con tu tarjeta.</span></div>
+        <details className="fdet full">
+          <summary>Más datos (opcional)</summary>
+          <div className="fgrid">
+            <div className="field full"><label htmlFor="cm-t">Identificador de la transacción</label><div className="inp"><input id="cm-t" type="text" value={f.reference} onChange={set('reference')} placeholder="28990819463938228-28947602274926610" maxLength={80} autoComplete="off" /></div></div>
+            <div className="field full"><label htmlFor="cm-n">Nota</label><div className="inp"><input id="cm-n" type="text" value={f.notes} onChange={set('notes')} maxLength={300} /></div></div>
+          </div>
+        </details>
+        {error && <div className="tint bad full" role="alert" style={{ margin: 0 }}><b style={{ color: 'var(--coral-ink)' }}>{error}</b></div>}
+        <div className="fbar full"><button type="button" className="btn ghost" onClick={onCerrar}>Cancelar</button><button className="btn" disabled={ocupado}>{ocupado ? 'Guardando…' : 'Guardar cobro'}</button></div>
       </form>
     </Dialogo>
   )

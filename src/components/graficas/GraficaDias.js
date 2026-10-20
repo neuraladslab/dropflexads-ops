@@ -66,7 +66,7 @@ export default function GraficaDias({ dias: diasProp, vistas, tipo = 'barras', m
   const vals = pts.map((p) => p.v).filter((v) => v != null)
   const esc = escala(vals.length ? Math.min(...vals) : 0, vals.length ? Math.max(...vals) : 1)
   const y = (v) => T + (H - T - B) * (1 - (v - esc.a) / (esc.b - esc.a || 1))
-  const f = FMT[formato], conValor = slot >= 46, paso = Math.max(1, Math.ceil(60 / slot))
+  const f = FMT[formato], conValor = slot >= 62, paso = Math.max(1, Math.ceil(60 / slot))
   const unidad = modo === 'dia' ? 'días' : modo === 'semana' ? 'semanas' : 'meses'
 
   // Titular: el mensaje de la gráfica según los datos que se ven.
@@ -136,7 +136,7 @@ export default function GraficaDias({ dias: diasProp, vistas, tipo = 'barras', m
               return (
                 <g key={p.dia}>
                   <rect x={x(i) - bw / 2} y={top} width={bw} height={h} rx="6" fill={metrica.tipo === 'neto' ? (p.v >= 0 ? 'var(--jade)' : 'var(--coral)') : color} />
-                  {(conValor || marcas.has(i)) && p.v !== 0 && <text x={x(i)} y={p.v >= 0 ? top - 7 : top + h + 15} textAnchor="middle" style={{ font: '700 13px var(--sans)', fill: metrica.tipo === 'neto' ? (p.v >= 0 ? 'var(--jade-ink)' : 'var(--coral-ink)') : 'var(--ink)' }}>{etiqueta(p.v)}</text>}
+                  {(conValor || marcas.has(i)) && p.v !== 0 && <text x={i === n - 1 && n > 3 ? x(i) + slot / 2 - 3 : x(i)} y={p.v >= 0 ? top - 7 : top + h + 15} textAnchor={i === n - 1 && n > 3 ? 'end' : 'middle'} style={{ font: '700 13px var(--sans)', fill: metrica.tipo === 'neto' ? (p.v >= 0 ? 'var(--jade-ink)' : 'var(--coral-ink)') : 'var(--ink)' }}>{etiqueta(p.v)}</text>}
                 </g>
               )
             })}
@@ -164,8 +164,8 @@ export default function GraficaDias({ dias: diasProp, vistas, tipo = 'barras', m
         )}
       </div>
       {activa && activa.nota && <p className="gr-note">{activa.nota}</p>}
-      {ayuda && <p className="gr-note only-learner"><b>Cómo leer esta gráfica:</b> {ayuda}</p>}
-      <p className="gr-note only-pro" style={{ marginTop: 6 }}>{n} {unidad} · pasa el cursor por un punto para ver el detalle.</p>
+      {ayuda && <p className="gr-note only-learner m-oculto"><b>Cómo leer esta gráfica:</b> {ayuda}</p>}
+      <p className="gr-note" style={{ marginTop: 6 }}>{n} {unidad} · <span className="m-lg">pasa el cursor por un punto</span><span className="m-sm">toca un punto o una barra</span> para ver qué es y cuánto vale.</p>
     </div>
   )
 }

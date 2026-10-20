@@ -24,6 +24,22 @@ export function parseInsights(rows) {
   return out
 }
 
+/** Filas de /insights a nivel ANUNCIO (un día por fila) → filas para guardar. */
+export function parseInsightsAnuncios(rows) {
+  const out = []
+  for (const r of rows || []) {
+    const id = String(r.ad_id || '').replace(/\D/g, '').slice(0, 40), day = /^\d{4}-\d{2}-\d{2}$/.test(r.date_start || '') ? r.date_start : null
+    if (!id || !day) continue
+    const compra = (arr) => (Array.isArray(arr) ? arr.find((a) => a.action_type === 'omni_purchase') || arr.find((a) => a.action_type === 'purchase') : null)
+    out.push({
+      day, adId: id, adName: String(r.ad_name || '').slice(0, 250), campaignId: String(r.campaign_id || '').replace(/\D/g, '').slice(0, 40) || null, spend: r2(num(r.spend)),
+      impressions: Math.round(num(r.impressions)), clicks: Math.round(num(r.clicks)),
+      purchases: Math.round(num((compra(r.actions) || {}).value)), purchaseValue: r2(num((compra(r.action_values) || {}).value)),
+    })
+  }
+  return out
+}
+
 /** Estado de un cobro según el texto que mande Meta. */
 export const estadoCobro = (s) => { const t = String(s || '').toLowerCase(); return /fail|declin|refus|reject|cancel|error/.test(t) ? 'failed' : /pend|process|wait|hold|progress/.test(t) ? 'pending' : 'paid' }
 

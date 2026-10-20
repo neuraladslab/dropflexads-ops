@@ -25,7 +25,7 @@ export default function HojaInforme({ titulo, subtitulo, filasId, intro, puntos,
         <div style={{ flex: '1 1 100%' }}>{acciones}</div>
         <div className="field" style={{ minWidth: 240, flex: '1 1 240px' }}>
           <label htmlFor="rp-titular" style={{ fontSize: 12.5 }}>Titular(es) del informe</label>
-          <div className="inp"><input id="rp-titular" type="text" maxLength={120} value={titular} onChange={(e) => setTitular(e.target.value)} placeholder="Nombres de las socias" /></div>
+          <div className="inp"><input id="rp-titular" type="text" maxLength={120} value={titular} onChange={(e) => setTitular(e.target.value)} placeholder="Nombres de los socios" /></div>
         </div>
         <div style={{ flex: '1 1 100%' }}>
           <div className="muted" style={{ fontSize: 12.5, marginBottom: 4 }}>Qué incluir en el informe</div>

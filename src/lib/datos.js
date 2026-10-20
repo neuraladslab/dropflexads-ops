@@ -20,6 +20,7 @@ import { corteDesde } from '@/lib/corte'
 import { listarPeriodos, resumenPorPeriodo, flujoPorPeriodo, pedidosPorPeriodo, ventasPorPeriodo, tasaDevolucionReal, resolverPeriodo } from '@/domain/periodos.ts'
 import { estimarPendientes, DEVOLUCION_POR_DEFECTO } from '@/domain/estimacion.ts'
 import { evaluarSalud } from '@/domain/salud.ts'
+import { analizarEscalado, leerConfigEscalado } from '@/domain/escalado.ts'
 import { repartirUtilidad } from '@/domain/reparto.ts'
 import { ritmoPauta, deudaMeta } from '@/domain/pauta.ts'
 import { cambiosDesdeCierre, chequear } from '@/domain/cierre.ts'
@@ -461,13 +462,21 @@ export async function datosCortes(uid, m = new Map()) {
   // Salud de HOY: toda la billetera, con todo lo pendiente y el ritmo real de Meta.
   const hoyC = cortes[cortes.length - 1], ayer = sumarDias(hoy, -1)
   const pauta = ritmoPauta(gastosPauta, ayer)
-  const salud = evaluarSalud({
+  const entradaSaludHoy = {
     saldoBilletera: b.saldo, saldoTarjeta: tar.tarjetaDropi.saldo ?? null, utilidadAcumulada: acumulado, retirado,
     ritmoPauta: pauta.ritmo, deudaMeta: deudaMeta(gastosPauta, cobrosMeta, hoy), costoDevolucionesEsperado: devPend, gananciaEsperada: gananciaPend,
     diasPago: diasPagoGlobal, hoy, destinos: rep.destinos, cuadreMalo: hoyC.chequeos.some((x) => x.tono === 'bad'), datosViejos: viejo(cd) || viejo(cm),
-  })
+  }
+  const salud = evaluarSalud(entradaSaludHoy)
+  m.set('entradaSalud', entradaSaludHoy) // para que «Escalar» mida el efecto de cada presupuesto con el MISMO cálculo de liquidez
+  // De dónde sale la ganancia neta acumulada: lo que Dropi pagó menos cada gasto real, sumado en todos los cortes (así cuadra con la utilidad acumulada).
+  const sumar = (f) => Math.round(res.reduce((a, r) => a + f(r), 0) * 100) / 100
+  const origen = { ingresos: sumar((r) => r.total.ganancia), publicidad: sumar((r) => r.total.meta), devoluciones: sumar((r) => r.total.devoluciones), comisiones: sumar((r) => r.total.comisiones),
+    otros: sumar((r) => r.total.otrosDescuentos + r.total.otrosGastos), herramientas: sumar((r) => r.herramientas + r.total.pagosHerramientas), neto: acumulado }
+  origen.gastos = Math.round((origen.publicidad + origen.devoluciones + origen.comisiones + origen.otros + origen.herramientas) * 100) / 100 // todos los gastos reales juntos
+  origen.masGastos = Math.round((origen.herramientas + origen.comisiones + origen.otros) * 100) / 100 // herramientas, comisiones y otros
   cortes.reverse()
-  return { generado: Date.now(), corte, inicio, hoy, cortes, salud, ritmoPauta: pauta, retiradoTotal: Math.round(retirado * 100) / 100, utilidadRetenida: Math.max(0, Math.round((acumulado - retirado) * 100) / 100), saldoBilletera: b.saldo, saldoTarjeta: tar.tarjetaDropi ? tar.tarjetaDropi.saldo : null, herramientasPorDia: g.herramientasPorDia, reparto: { destinos: rep.destinos, propio: rep.propio }, pctDevolucion: pctEsperado, cierresListos: tablaCierres }
+  return { generado: Date.now(), corte, inicio, hoy, cortes, salud, origen, ritmoPauta: pauta, retiradoTotal: Math.round(retirado * 100) / 100, utilidadRetenida: Math.max(0, Math.round((acumulado - retirado) * 100) / 100), saldoBilletera: b.saldo, saldoTarjeta: tar.tarjetaDropi ? tar.tarjetaDropi.saldo : null, herramientasPorDia: g.herramientasPorDia, reparto: { destinos: rep.destinos, propio: rep.propio }, pctDevolucion: pctEsperado, cierresListos: tablaCierres }
 }
 
 /**
@@ -504,4 +513,36 @@ export async function periodoElegido(uid, param, m = new Map()) {
   const aj = await ajustesDe(uid, m), inicio = aj.op_from || OPERACION_INICIO, hoy = hoyBogota()
   const periodos = listarPeriodos(inicio, hoy, corteDesde(aj.cut_day))
   return { per: resolverPeriodo(param, periodos, hoy, inicio), cortes: [...periodos].reverse(), hoy, inicio }
+}
+
+/**
+ * Análisis probabilístico de escalar la pauta de UNA campaña con sus datos reales (gasto y clics de Meta, pedidos de Dropi, ganancia real por pedido, devoluciones y liquidez).
+ * `presupuesto` = uno extra que la persona quiere comparar. Devuelve null si la campaña no existe o no está vinculada a Meta.
+ */
+export async function datosEscalado(uid, clave, { presupuesto = null } = {}, m = new Map()) {
+  const [c, camp, base, aj] = await Promise.all([datosCampana(uid, clave, m), datosCampanas(uid, m), datosCortes(uid, m), ajustesDe(uid, m)])
+  if (!c || !c.meta || !c.conTabs || !c.metaId) return null
+  const cfg = leerConfigEscalado(aj.esc_cfg), hoy = hoyBogota()
+  const filas = [...c.meta.filas].reverse() // del más viejo al más nuevo
+  const dias = filas.filter((f) => f.spend >= 1000 && f.clicks > 0).map((f) => ({ dia: f.d, gasto: f.spend, clics: f.clicks, impresiones: f.imp }))
+  if (!dias.length) return { sinDatos: true, campana: { id: c.id, nombre: c.nombre }, cfg }
+  const lista = c.pedidos.lista, primero = dias[0].dia
+  const desde = lista.filter((x) => x.creado && x.creado >= primero)
+  // Pedidos creados cada día calendario desde el primer día con pauta (con los días en cero): miden qué tan «a lotes» llegan los pedidos.
+  const porDia = new Map(); for (const x of desde) porDia.set(x.creado, (porDia.get(x.creado) || 0) + 1)
+  const ultimoCompleto = new Date(Date.parse(hoy + 'T12:00:00Z') - 864e5).toISOString().slice(0, 10), pedidosPorDia = []
+  for (let d = primero; d <= ultimoCompleto; d = new Date(Date.parse(d + 'T12:00:00Z') + 864e5).toISOString().slice(0, 10)) pedidosPorDia.push(porDia.get(d) || 0)
+  const ganancias = lista.filter((x) => x.contable === 'pagado').map((x) => camp.gananciaPorPedido.get(x.idPedido)).filter((v) => v > 0)
+  const r = c.r || { entregados: 0, devueltos: 0, costoDevoluciones: 0 }
+  const paramsEst = m.get('paramsEst') || {}
+  const flete = paramsEst.fleteDevolucion || (r.devueltos > 0 ? r.costoDevoluciones / r.devueltos : 15000)
+  const recientes = dias.slice(-5).map((d) => d.gasto).sort((a, b) => a - b), medianaReciente = recientes[Math.floor(recientes.length / 2)]
+  const confirmado = cfg.presupuestos[c.id] != null
+  const presupuestoActual = confirmado ? cfg.presupuestos[c.id] : Math.max(5000, Math.round(medianaReciente / 5000) * 5000)
+  const entrada = {
+    dias, pedidos: desde.length, pedidosPorDia, entregados: r.entregados, devueltos: r.devueltos, gananciaPorPedido: ganancias, fleteDevolucion: flete, devolucionEsperadaPct: c.devolucionPct ?? 15, vat: c.meta.vat ?? 19,
+    presupuestoActual, hoy, salud: m.get('entradaSalud'), riesgo: cfg.riesgo, presupuestosExtra: presupuesto && presupuesto >= 5000 && presupuesto <= 5_000_000 ? [Math.round(presupuesto)] : [],
+  }
+  const analisis = analizarEscalado(entrada)
+  return { campana: { id: c.id, nombre: c.nombre, metaId: c.metaId }, cfg, confirmado, analisis, reglas: c.escalar, resumen: { vat: c.meta.vat ?? 19, pedidosPorDia, diasConPauta: dias.length, pedidos: desde.length, entregados: r.entregados, devueltos: r.devueltos, enCurso: r.enCurso ?? null, clics: Math.round(dias.reduce((a, d) => a + d.clics, 0)), gastoSinIva: Math.round(dias.reduce((a, d) => a + d.gasto, 0)), ultimoDia: dias[dias.length - 1].dia }, saludHoy: base.salud }
 }

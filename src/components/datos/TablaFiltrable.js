@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { cop, fmtN } from '@/lib/formato'
 
 // Tabla con filtros (texto, estados con casillas, fechas), selección de filas con suma y paginación. Todo se resuelve en el navegador sobre las filas recibidas.
@@ -59,6 +59,9 @@ export default function TablaFiltrable({ filas, columnas, estados, buscar = 'Bus
   const [pagina, setPagina] = useState(1)
   const [tam, setTam] = useState(25)
   const [marcados, setMarcados] = useState(() => new Set()) // ids marcados con la casilla
+  const [abiertas, setAbiertas] = useState(() => new Set()) // filas con el detalle completo abierto (en el celular, tocando el texto)
+  const alternarDetalle = (id) => setAbiertas((a) => { const n = new Set(a); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const hayDetalle = columnas.some((c) => c.txt || c.m)
 
   const cuenta = useMemo(() => { const c = {}; for (const f of filas) c[f.estado] = (c[f.estado] || 0) + 1; return c }, [filas])
   const filtradas = useMemo(() => {
@@ -123,14 +126,23 @@ export default function TablaFiltrable({ filas, columnas, estados, buscar = 'Bus
       <div className="card tbl-card"><div className="scroll-x"><table className="tbl">
         <thead><tr>
           <th style={{ width: 36, minWidth: 0, textAlign: 'center' }}><input type="checkbox" className="pay-ck" checked={todasPagina} onChange={alternarPagina} aria-label="Señalar todos los de esta página" disabled={!visibles.length} /></th>
-          {columnas.map((c) => <th key={c.titulo} className={c.izq || c.txt ? 'st' : undefined}>{c.titulo}</th>)}
+          {columnas.map((c) => <th key={c.titulo} className={[c.izq || c.txt ? 'st' : '', c.m ? 'm-oculto' : ''].join(' ').trim() || undefined}>{c.titulo}</th>)}
         </tr></thead>
         <tbody>
           {visibles.map((f) => (
-            <tr key={f.id} className={marcados.has(f.id) ? 'row sel' : undefined} style={marcados.has(f.id) ? { background: 'var(--blue-soft)' } : undefined}>
-              <td style={{ minWidth: 0, width: 36, textAlign: 'center' }}><input type="checkbox" className="pay-ck" checked={marcados.has(f.id)} onChange={() => alternar(f.id)} aria-label="Señalar" /></td>
-              {columnas.map((c) => <td key={c.titulo} className={c.txt ? 'txt' : c.izq ? 'st' : undefined}>{c.celda(f)}</td>)}
-            </tr>
+            <Fragment key={f.id}>
+              <tr className={marcados.has(f.id) ? 'row sel' : undefined} style={marcados.has(f.id) ? { background: 'var(--blue-soft)' } : undefined}>
+                <td style={{ minWidth: 0, width: 36, textAlign: 'center' }}><input type="checkbox" className="pay-ck" checked={marcados.has(f.id)} onChange={() => alternar(f.id)} aria-label="Señalar" /></td>
+                {columnas.map((c) => <td key={c.titulo} className={[c.txt ? 'txt' : c.izq ? 'st' : '', c.m ? 'm-oculto' : ''].join(' ').trim() || undefined}>{c.txt
+                  ? <span className={'clamp' + (abiertas.has(f.id) ? ' abierto' : '')} role="button" tabIndex={0} aria-expanded={abiertas.has(f.id)} onClick={() => alternarDetalle(f.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternarDetalle(f.id) } }}>{c.celda(f)}</span>
+                  : c.celda(f)}</td>)}
+              </tr>
+              {hayDetalle && abiertas.has(f.id) && (
+                <tr className="fila-det"><td colSpan={columnas.length + 1}>
+                  <dl>{columnas.filter((c) => c.txt || c.m).map((c) => <div key={c.titulo}><dt>{c.titulo}</dt><dd>{c.celda(f) || '—'}</dd></div>)}</dl>
+                </td></tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table></div>

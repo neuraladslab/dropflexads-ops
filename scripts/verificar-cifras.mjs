@@ -42,6 +42,7 @@ for (const c of C) {
   igual(`${c.desde}: saldo al abrir + entró − salió  ≡  saldo al cerrar`, (c.flujo.saldoApertura ?? 0) + c.flujo.totalEntra - c.flujo.totalSale, c.flujo.saldoCierre ?? 0, 1)
 }
 igual('Reparto: Σ de todos los cortes  ≡  utilidad acumulada', suma(C, (c) => c.reparto.base), s.utilidadAcumulada)
+{ const o = cortes.origen; igual('Paso a paso: Dropi pagó − cada gasto  ≡  ganancia neta acumulada', o.ingresos - o.publicidad - o.devoluciones - o.comisiones - o.otros - o.herramientas, o.neto, 0.05); igual('Paso a paso: ganancia neta  ≡  utilidad acumulada de la salud', o.neto, s.utilidadAcumulada, 0.05) }
 
 console.log('\n[Salud] el retiro recomendado nunca pasa ninguno de sus tres límites')
 igual('Apartado + libre  ≡  saldo de la billetera', s.bloqueado + s.libre, s.saldo)

@@ -10,7 +10,7 @@ export type Foto = {
 
 const CAMPOS: [keyof Foto, string][] = [
   ["ganancia", "Ganancia de pedidos"], ["costos", "Gastos del corte"], ["neto", "Neto del corte"], ["saldoCierre", "Saldo de la billetera al cerrar"],
-  ["retiros", "Retiros"], ["pendientesN", "Pedidos pendientes"], ["pendientesValor", "Valor de venta pendiente"], ["retiroSeguro", "Retiro seguro para las socias"],
+  ["retiros", "Retiros"], ["pendientesN", "Pedidos pendientes"], ["pendientesValor", "Valor de venta pendiente"], ["retiroSeguro", "Retiro seguro para los socios"],
 ];
 export type Cambio = { campo: string; etiqueta: string; antes: number; despues: number; dif: number };
 

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SECCIONES } from './nav'
 import { Icono } from './Icono'
 import Paleta from './Paleta'
+import { AsistenteFlotante } from '@/components/ia/AsistenteFlotante'
 import EstadoDatos from './EstadoDatos'
 
 const activo = (pathname, href) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/'))
@@ -94,7 +95,7 @@ export default function AppShell({ email, children }) {
             <div className="spacer" />
             <EstadoDatos />
             <div className="seg" role="group" aria-label="Nivel de ayuda">
-              <button type="button" aria-pressed={nivel === 'learner'} className={nivel === 'learner' ? 'on' : ''} onClick={() => cambiarNivel('learner')}>Modo Aprendiz</button>
+              <button type="button" aria-pressed={nivel === 'learner'} className={nivel === 'learner' ? 'on' : ''} onClick={() => cambiarNivel('learner')}><span className="m-lg">Modo Aprendiz</span><span className="m-sm">Aprendiz</span></button>
               <button type="button" aria-pressed={nivel === 'pro'} className={nivel === 'pro' ? 'on' : ''} onClick={() => cambiarNivel('pro')}>Avanzado</button>
             </div>
             <div ref={menuRef} style={{ position: 'relative' }}>
@@ -113,6 +114,7 @@ export default function AppShell({ email, children }) {
         </main>
       </div>
       <Paleta abierta={paleta} onCerrar={() => setPaleta(false)} />
+      <AsistenteFlotante />
     </>
   )
 }

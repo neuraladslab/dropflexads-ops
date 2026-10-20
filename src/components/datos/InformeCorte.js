@@ -31,7 +31,7 @@ export function InformeCorte({ c, anterior, d }) {
   const faltan = Math.max(0, Math.round((Date.parse(c.hasta + 'T12:00:00Z') - Date.parse(d.hoy + 'T12:00:00Z')) / 864e5))
   const gastos = [['Publicidad en Meta (con IVA)', t.meta], ['Otros gastos de la tarjeta', t.otrosGastos], ['Devoluciones (flete cobrado por Dropi)', t.devoluciones], ['Comisiones y mantenimiento de la tarjeta', t.comisiones], ['Otros descuentos de Dropi', t.otrosDescuentos], ['Herramientas (pagos desde la billetera y costos fijos)', c.herramientas + t.pagosHerramientas]].filter(([, x]) => x > 0)
   const dias = [...c.dias].sort((a, b2) => (a.dia < b2.dia ? -1 : 1))
-  const retiroPorSocia = b.retiroSeguro > 0 && sumaPct > 0 ? socias.map((x) => `${x.nombre} ${cop((b.retiroSeguro * x.pct) / sumaPct)}`).join(' · ') : null
+  const retiroPorSocio = b.retiroSeguro > 0 && sumaPct > 0 ? socias.map((x) => `${x.nombre} ${cop((b.retiroSeguro * x.pct) / sumaPct)}`).join(' · ') : null
 
   const puntos = alertas.map((x) => `${x.titulo}. ${x.detalle}`)
   const intro = (
@@ -66,7 +66,7 @@ export function InformeCorte({ c, anterior, d }) {
           <F2 key="c" t="Entró: aportes y otros" v={f.otrasEntradas ? cop(f.otrasEntradas) : '—'} />,
           <F2 key="d" t="Salió: pasado a la tarjeta" v={menos(f.aTarjeta)} nota="traslado a la tarjeta de Dropi: no es gasto hasta que se usa en publicidad" />,
           <F2 key="e" t="Salió: descuentos (devoluciones, comisiones, pagos)" v={menos(f.descuentos)} />,
-          <F2 key="f" t="Salió: retiros" v={menos(f.retiros)} nota="plata de las socias que se sacó: no es gasto ni ganancia" />,
+          <F2 key="f" t="Salió: retiros" v={menos(f.retiros)} nota="plata de los socios que se sacó: no es gasto ni ganancia" />,
           <F2 key="g" t={c.abierto ? 'Saldo hoy' : 'Saldo al cerrar el corte'} v={f.saldoCierre != null ? cop(f.saldoCierre) : '—'} fuerte />]} />
         <p className="sub only-learner">El saldo no se corta: lo que queda pasa completo al siguiente corte, porque esa plata paga campañas hasta que se decida retirarla.{c.abierto && d.saldoTarjeta != null && ` Saldo de la tarjeta hoy: ${cop(d.saldoTarjeta)}.`}</p>
       </>) },
@@ -109,8 +109,8 @@ export function InformeCorte({ c, anterior, d }) {
             <F2 key="c" t="Debe quedar: devoluciones esperadas" v={cop(b.piso.devoluciones)} />,
             <F2 key="d" t="Debe quedar: imprevistos, ahorro e impuestos" v={cop(b.seQueda)} />,
             <F2 key="e" t="Libre (lo máximo que podría salir)" v={cop(b.libre)} fuerte />,
-            <F2 key="f" t="Les toca a las socias (acumulado) menos lo ya retirado" v={cop(b.sociasPorRetirar)} nota={`acumulado ${cop(b.sociasAcumulado)} − retirado ${cop(b.retirado)}`} />,
-            <F2 key="g" t="Retiro recomendado" v={cop(b.retiroSeguro)} fuerte nota={retiroPorSocia || undefined} />]} />
+            <F2 key="f" t="Les toca a los socios (acumulado) menos lo ya retirado" v={cop(b.sociasPorRetirar)} nota={`acumulado ${cop(b.sociasAcumulado)} − retirado ${cop(b.retirado)}`} />,
+            <F2 key="g" t="Retiro recomendado" v={cop(b.retiroSeguro)} fuerte nota={retiroPorSocio || undefined} />]} />
         )}
         <p className="sub only-learner">Es una sugerencia: parte de la utilidad (no de todo lo que entró), exige que la billetera siga cubriendo 7 días de pauta y nunca supera la ganancia neta que queda en la operación. Los porcentajes se cambian en Configuración → Reparto.{!d.reparto.propio && ' Hoy usa el reparto sugerido.'}</p>
       </>) },
@@ -124,7 +124,7 @@ export function InformeCorte({ c, anterior, d }) {
         <div className="only-pro">
           <div style={{ height: 8 }} />
           <T cab={[['Indicador'], ['Este corte', 1], ['Corte anterior', 1]]} filas={[
-            <tr key="a"><td>ROAS de caja (ganancia ÷ publicidad)</td><Td n>{t.meta > 0 ? (t.ganancia / t.meta).toFixed(2) : '—'}</Td><Td n>{anterior && anterior.total.meta > 0 ? (anterior.total.ganancia / anterior.total.meta).toFixed(2) : '—'}</Td></tr>,
+            <tr key="a"><td>ROAS de caja (ganancia ÷ publicidad)</td><Td n>{t.meta > 0 ? (t.ganancia / t.meta).toFixed(2).replace('.', ',') : '—'}</Td><Td n>{anterior && anterior.total.meta > 0 ? (anterior.total.ganancia / anterior.total.meta).toFixed(2).replace('.', ',') : '—'}</Td></tr>,
             <tr key="b"><td>Publicidad por pedido pagado</td><Td n>{t.meta > 0 && t.entregas > 0 ? cop(t.meta / t.entregas) : '—'}</Td><Td n>{anterior && anterior.total.meta > 0 && anterior.total.entregas > 0 ? cop(anterior.total.meta / anterior.total.entregas) : '—'}</Td></tr>,
             <tr key="c"><td>Margen (te quedó ÷ entró)</td><Td n>{pct(c.neto, t.ganancia)}</Td><Td n>{anterior ? pct(anterior.neto, anterior.total.ganancia) : '—'}</Td></tr>,
             <tr key="d"><td>Devolución real vs esperada ({d.pctDevolucion} %)</td><Td n>{c.tasaDevolucion != null ? c.tasaDevolucion + ' %' : '—'}</Td><Td n>{anterior && anterior.tasaDevolucion != null ? anterior.tasaDevolucion + ' %' : '—'}</Td></tr>,
@@ -148,7 +148,7 @@ export function InformeCorte({ c, anterior, d }) {
     `Entró a la billetera ${cop(t.ganancia)} · gastos ${cop(c.costos)} · neto ${signo(c.neto)} · pedidos pagados ${fmtN(t.entregas)}.`,
     `Pendientes: ${fmtN(p.pendientes.n)} pedidos (valor de venta ${cop(p.pendientes.valor)}); ganancia esperada ≈ ${cop(esperado)} (estimado).`,
     `Reparto del corte: ${cop(r.base)}${r.base > 0 ? ' → ' + r.filas.map((x) => `${x.nombre} ${cop(x.monto)}`).join(' · ') : ''}.`,
-    `Billetera ${c.abierto ? 'hoy' : 'al cierre'}: ${b.saldo != null ? cop(b.saldo) : '—'} · ${b.titulo}${retiroPorSocia ? ' (' + retiroPorSocia + ')' : ''}.`,
+    `Billetera ${c.abierto ? 'hoy' : 'al cierre'}: ${b.saldo != null ? cop(b.saldo) : '—'} · ${b.titulo}${retiroPorSocio ? ' (' + retiroPorSocio + ')' : ''}.`,
     puntos.length ? 'Puntos a revisar:' : 'Cuadre: todo correcto.', ...puntos.map((x, i) => `${i + 1}. ${x}`),
   ].join('\n')
 
