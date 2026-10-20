@@ -6,8 +6,12 @@ import { sumarDias } from "./fechas.ts";
 import type { DiaFlujo } from "./billetera.ts";
 
 export const CORTE_POR_DEFECTO = 12;
-/** Hasta el 28 para que el día exista en todos los meses. */
-export const diaCorteValido = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 28;
+/** Corte «último día del mes»: se guarda como 31 y cada mes cierra en su último día (28, 29, 30 o 31). */
+export const FIN_DE_MES = 31;
+/** Del 1 al 28 (existe en todos los meses) o FIN_DE_MES. Un 29 o 30 fijo no existiría en febrero, y dejaría periodos mal armados. */
+export const diaCorteValido = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && ((n >= 1 && n <= 28) || n === FIN_DE_MES);
+/** Texto para pantallas: «12», «último día del mes». */
+export const textoCorte = (corte: number) => (corte === FIN_DE_MES ? "último día del mes" : String(corte));
 
 export type Periodo = { id: string; desde: string; hasta: string; abierto: boolean };
 
@@ -15,13 +19,19 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const partes = (dia: string) => ({ a: Number(dia.slice(0, 4)), m: Number(dia.slice(5, 7)), d: Number(dia.slice(8, 10)) });
 const fecha = (a: number, m: number, d: number) => { const t = new Date(Date.UTC(a, m - 1, d)); return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`; };
 
+/** Día en que cierra el corte en un mes concreto (m de 1 a 12, puede desbordar: lo normaliza la fecha): el fijo, o el último del mes si el corte es FIN_DE_MES. */
+const diaDeCorte = (a: number, m: number, corte: number): number => {
+  if (corte !== FIN_DE_MES) return corte;
+  const t = new Date(Date.UTC(a, m, 0)); // día 0 del mes siguiente = último día de m
+  return t.getUTCDate();
+};
 /** Último día (inclusive) del periodo al que pertenece `dia`. */
 function finDe(dia: string, corte: number): string {
   const { a, m, d } = partes(dia);
-  return d <= corte ? fecha(a, m, corte) : fecha(a, m + 1, corte);
+  return d <= diaDeCorte(a, m, corte) ? fecha(a, m, diaDeCorte(a, m, corte)) : fecha(a, m + 1, diaDeCorte(a, m + 1, corte));
 }
-/** Primer día del periodo que termina en `fin`. */
-const inicioDe = (fin: string, corte: number): string => { const { a, m } = partes(fin); return fecha(a, m - 1, corte + 1); };
+/** Primer día del periodo que termina en `fin`: el día siguiente al cierre del mes anterior. */
+const inicioDe = (fin: string, corte: number): string => { const { a, m } = partes(fin); return fecha(a, m - 1, diaDeCorte(a, m - 1, corte) + 1); };
 
 /** Periodo de un día. `inicioOperacion` recorta el comienzo del primer periodo; `hoy` marca si sigue abierto. */
 export function periodoDe(dia: string, corte: number, inicioOperacion: string, hoy: string): Periodo {

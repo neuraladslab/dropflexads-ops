@@ -12,7 +12,7 @@ export const GET = guard(async (_req, _ctx, session) => ok({ dia: await corteDia
 export const PUT = guard(async (request, _ctx, session) => {
   const b = await readBody(request)
   const dia = Number(b && b.dia)
-  if (!diaCorteValido(dia)) return bad('El día de corte debe ser un número del 1 al 28.')
+  if (!diaCorteValido(dia)) return bad('El día de corte debe ser del 1 al 28 o «último día del mes».')
   const antes = await getSetting(session.userId, 'cut_day')
   await setSetting(session.userId, 'cut_day', dia)
   await logActivity(session.userId, `Cambiaste el día de corte del mes${antes ? ` (de ${antes} a ${dia})` : `: ${dia}`}`)
