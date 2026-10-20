@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Pendiente } from '@/components/shell/Pagina'
 import { VistaPedidos, VistaGastoCampana, VistaInformeDiario } from '@/components/datos/Vistas'
 import { VistaEscalado } from '@/components/datos/VistaEscalado'
+import Creativos from '@/components/Creativos'
+import { datosCreativos } from '@/lib/creativos'
 import PanelMeta from '@/components/PanelMeta'
 import ResultadoCampana from '@/components/ResultadoCampana'
 import TarjetaCombos from '@/components/datos/TarjetaCombos'
@@ -56,7 +57,7 @@ export default async function PaginaCampana({ params, searchParams }) {
       {slug === '' && <VistaPedidos d={c.pedidos} ocultarCampana={c.conTabs || c.clave === 'sin'} sinKpis={!!c.r} vacio={vacio} />}
       {slug === 'informe' && <VistaInformeDiario filas={c.informe} nombre={c.nombre} />}
       {slug === 'meta' && <><PanelMeta /><VistaGastoCampana m={c.meta} inicio={c.inicio} /></>}
-      {slug === 'creativos' && <Pendiente titulo={`Creativos de «${c.nombre}»`} queMuestra="Los anuncios de esta campaña con su nombre estándar, el enlace al archivo y su resultado (alcance, CPA y gasto de cada uno)." fuente="Meta Ads: cada anuncio se une a su campaña." fase="Después de conectar Meta" />}
+      {slug === 'creativos' && <Creativos d={await datosCreativos(uid, { campanaId: id })} campanaFija={id} />}
       {slug === 'escalar' && <VistaEscalado d={await datosEscalado(uid, id, { presupuesto: Number(uno(sp.s)) || null }, m)} s={Number(uno(sp.s)) || null} nombre={c.nombre} tieneIA={(await estadoIA(uid)).tieneClave} />}
     </>
   )

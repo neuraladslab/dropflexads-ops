@@ -305,7 +305,7 @@ export function VistaEscalar({ e, nombre, vinculada }) {
         <div style={{ fontSize: 14.5, marginTop: 4 }}>
           {e.veredicto === 'escalar' && <>Pasa de {cop(Math.round(e.presupuesto))} a <b>{cop(Math.round(e.nuevoPresupuesto))}</b> por día (sin IVA) y espera <b>3 días</b> antes de volver a subir. Si el costo por venta se dispara, vuelve al presupuesto anterior.</>}
           {e.veredicto === 'vigilar' && <>Falta: {fallan.map((c) => c.texto.split(':')[0].toLowerCase()).join('; ')}. No subas el presupuesto todavía.</>}
-          {e.veredicto === 'pausar' && <>Por cada $1 que pones, recuperas ${e.roasPrudente.toFixed(2)} de ganancia (con entrega prudente): estás perdiendo plata. Revisa el anuncio o el producto antes de gastar más.</>}
+          {e.veredicto === 'pausar' && <>Por cada $1 que pones, recuperas ${e.roasPrudente.toFixed(2).replace('.', ',')} de ganancia (con entrega prudente): estás perdiendo plata. Revisa el anuncio o el producto antes de gastar más.</>}
         </div>
       </div>
       <div className="kpis" style={{ marginBottom: 16 }}>

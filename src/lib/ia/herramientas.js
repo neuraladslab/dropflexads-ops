@@ -2,6 +2,7 @@ import 'server-only'
 // Herramientas de SOLO LECTURA que la IA puede llamar. Cada una consulta los mismos cargadores que las pantallas (así las cifras son las mismas) y devuelve un resumen compacto con números;
 // nunca nombres, teléfonos ni direcciones de clientes (el sistema ni siquiera los guarda). Todas quedan amarradas al usuario que pregunta: la IA no puede pedir datos de otro.
 import { datosPeriodo, datosCortes, datosCampanas, datosEscalado, datosPedidos } from '@/lib/datos'
+import { datosCreativos } from '@/lib/creativos'
 import { GLOSARIO } from '@/lib/glosario'
 
 const pesos = (n) => (typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : n) // dinero de escalar: pesos enteros, sin centavos
@@ -14,6 +15,7 @@ export const DEFINICIONES = [
   { name: 'obtener_periodo', description: 'Resumen del dinero de un periodo: Entró, Gastaste, Te quedó, Por cobrar (estimado), pedidos por estado, a dónde se fue el dinero y costo por venta. `periodo` es "actual" (corte actual), "anterior", "todo", el día de cierre de un corte (AAAA-MM-DD) o un rango "AAAA-MM-DD_AAAA-MM-DD".', input_schema: { type: 'object', properties: { periodo: { type: 'string', description: 'actual | anterior | todo | AAAA-MM-DD | AAAA-MM-DD_AAAA-MM-DD' } }, required: ['periodo'], additionalProperties: false } },
   { name: 'listar_cortes', description: 'Todos los cortes (periodos que cierran cada mes) con lo que entró, lo que se gastó, lo que quedó, pedidos pendientes y si están sellados.', input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false } },
   { name: 'listar_campanas', description: 'Las campañas con su resultado: pedidos por estado, ganancia real, tasa de devolución y devolución esperada. Incluye el id de cada campaña.', input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false } },
+  { name: 'listar_creativos', description: 'Los creativos (videos e imágenes) con su nombre estándar, ángulo, formato, estado (circulando, pausado, apagado, archivado) y su lectura de resultados por anuncio de Meta: funciona, regular, refrescar o probando, con gasto sin IVA, CTR, costo por clic y compras. Incluye un resumen por ángulo y por formato. `campana_id` = id de la campaña (de listar_campanas) o la palabra «todas».', strict: true, input_schema: { type: 'object', properties: { campana_id: { type: 'string', description: 'id de la campaña o «todas»' } }, required: ['campana_id'], additionalProperties: false } },
   { name: 'obtener_escalado', description: 'Análisis probabilístico de escalar la pauta de una campaña: presupuesto actual, acción recomendada, tabla de presupuestos con probabilidad de ganar y casos pesimista/mediano/optimista, liquidez, ruta por pasos, alertas de salida y calidad de la evidencia. Todo es ESTIMADO. `presupuesto_diario` = otro presupuesto (sin IVA) para comparar, o 0 si no hay.', input_schema: { type: 'object', properties: { campana_id: { type: 'string', description: 'id de la campaña (de listar_campanas)' }, presupuesto_diario: { type: 'integer', description: '0 si no se quiere comparar otro presupuesto' } }, required: ['campana_id', 'presupuesto_diario'], additionalProperties: false } },
   { name: 'obtener_pedidos', description: 'Cantidad y valor de venta de TODOS los pedidos por estado contable (pagado, en curso, entregado sin pagar, devuelto, etc.). No trae datos de clientes.', input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false } },
   { name: 'obtener_avisos', description: 'Los avisos de cuadre y calidad de datos del corte actual (billetera que no cuadra, datos desactualizados, herramientas sin cargar, anticipos…).', input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false } },
@@ -49,6 +51,16 @@ export function crearHerramientas(uid, m = new Map()) {
     async listar_campanas() {
       const d = await datosCampanas(uid, m)
       return { fuente: 'listar_campanas', campanas: d.campanas.map((c) => ({ id: c.id, nombre: corto(c.nombre, 80), activa: c.activa, vinculadaAMeta: !!c.metaId, devolucionEsperadaPct: c.devolucionPct, pedidos: c.r ? c.r.pedidos : 0, entregados: c.r ? c.r.entregados : 0, pagados: c.r ? c.r.pagados : 0, devueltos: c.r ? c.r.devueltos : 0, enCurso: c.r ? c.r.enCurso : 0, gananciaReal: c.r ? r2(c.r.ganancia) : 0, tasaDevolucionRealPct: c.r ? c.r.tasaDevolucion : null })) }
+    },
+    async listar_creativos({ campana_id }) {
+      const id = /^\d{1,9}$/.test(String(campana_id)) ? String(campana_id) : null
+      const d = await datosCreativos(uid, id ? { campanaId: id } : {})
+      if (d.sinMigracion) return { error: 'el módulo de creativos aún no está preparado (falta la migración de la base de datos)' }
+      return { fuente: 'listar_creativos', hayGastoPorAnuncioDeMeta: d.hayGastoPorAnuncio, totalCreativos: d.creativos.length, porEstado: d.conteo, anunciosDeMetaSinCreativo: d.sinEnlazar.length,
+        creativos: d.creativos.slice(0, 40).map((c) => ({ nombre: c.nombre, campana: corto(c.campana, 60), angulo: c.angulo, formato: c.formato, version: c.version, estado: c.estado, lectura: c.lectura.etiqueta, porQue: corto(c.lectura.motivos.join(' '), 220),
+          avisos: c.lectura.alertas.map((x) => corto(x, 160)), gastoSinIva: r2(c.lectura.gasto), ctrPct: c.lectura.ctr == null ? null : r2(c.lectura.ctr * 100), costoPorClic: c.lectura.cpc, compras: c.lectura.compras, costoPorCompra: c.lectura.costoCompra, diasConGasto: c.lectura.diasConGasto })),
+        resumenPorAngulo: d.resumen.porAngulo.slice(0, 15).map((x) => ({ angulo: x.clave, creativos: x.creativos, funcionan: x.funcionan, aRefrescar: x.refrescar, gastoSinIva: x.gasto, costoPorCompra: x.costoCompra })),
+        resumenPorFormato: d.resumen.porFormato.map((x) => ({ formato: x.clave, creativos: x.creativos, funcionan: x.funcionan, aRefrescar: x.refrescar, gastoSinIva: x.gasto })) }
     },
     async obtener_escalado({ campana_id, presupuesto_diario }) {
       if (!/^\d{1,9}$/.test(String(campana_id))) return { error: 'campaña no válida' }

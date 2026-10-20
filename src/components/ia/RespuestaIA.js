@@ -31,7 +31,7 @@ export function RespuestaIA({ r, compacta = false }) {
       )}
       <div className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>
         {r.fuentes && r.fuentes.length > 0 && <>Datos consultados: {r.fuentes.join(', ')} · </>}
-        La IA interpreta; las cifras las calcula el sistema. {r.costoUsd != null && <>Costo de esta consulta: US$ {Number(r.costoUsd).toFixed(3)}{r.usoMes && <> · este mes US$ {Number(r.usoMes.usd).toFixed(2)} de {r.usoMes.topeUsd}</>}.</>}
+        La IA interpreta; las cifras las calcula el sistema. {r.costoUsd != null && <>Costo de esta consulta: US$ {Number(r.costoUsd).toFixed(3).replace('.', ',')}{r.usoMes && <> · este mes US$ {Number(r.usoMes.usd).toFixed(2).replace('.', ',')} de {r.usoMes.topeUsd}</>}.</>}
       </div>
     </div>
   )

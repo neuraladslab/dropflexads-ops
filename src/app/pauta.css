@@ -168,7 +168,7 @@ body[data-level="learner"] .only-pro{display:none!important}
 .inp{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line2);border-radius:10px;padding:0 14px;transition:box-shadow .15s,border-color .15s}
 .inp:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(11,95,255,.14)}
 .inp input,.inp textarea{flex:1;min-width:0;border:0;background:transparent;font-family:var(--mono);font-size:18px;font-weight:600;padding:12px 0;outline:none;font-variant-numeric:tabular-nums}
-.inp input[type=search],.inp input[type=text]:not([data-num]){font-family:var(--sans);font-weight:500;font-size:16px}
+.inp input[type=search],.inp input[type=text]:not([data-num]),.inp input:not([type]),.inp input[type=url],.inp input[type=date],.inp input[type=email]{font-family:var(--sans);font-weight:500;font-size:16px}
 .inp textarea{font-family:var(--sans);font-size:15px;font-weight:400;resize:none;line-height:1.5;padding:12px 0}
 .inp .pre{color:var(--muted);font-weight:600;font-family:var(--mono)}
 .inp.err{border-color:var(--coral);box-shadow:0 0 0 3px rgba(239,68,68,.12)}
@@ -952,3 +952,17 @@ details.vz-det[open]>summary::before{content:"▾ "}
   .field select{text-overflow:ellipsis}
   form.card{min-width:0}
 }
+
+/* ---------- Formularios en diálogos: todo del mismo alto y alineado ---------- */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.fgrid>.full{grid-column:1/-1}
+.fgrid .inp,.fgrid .sel{width:100%;min-height:50px;box-sizing:border-box}
+.fgrid .sel{padding-top:0;padding-bottom:0}
+.field .hint{font-size:13px;color:var(--muted);line-height:1.4;font-weight:400}
+.fgrid .field{min-width:0}
+.fdet{border:1px solid var(--line);border-radius:12px;padding:0 14px;background:var(--panel)}
+.fdet>summary{cursor:pointer;font-weight:600;font-size:14px;min-height:46px;display:flex;align-items:center;color:var(--blue)}
+.fdet[open]{padding-bottom:14px}
+.fdet .fgrid{margin-top:4px}
+.fbar{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px}
+@media (max-width:560px){.fgrid{grid-template-columns:1fr}.fbar .btn{flex:1 1 auto}}

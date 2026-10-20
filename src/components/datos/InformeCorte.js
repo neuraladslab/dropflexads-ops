@@ -124,7 +124,7 @@ export function InformeCorte({ c, anterior, d }) {
         <div className="only-pro">
           <div style={{ height: 8 }} />
           <T cab={[['Indicador'], ['Este corte', 1], ['Corte anterior', 1]]} filas={[
-            <tr key="a"><td>ROAS de caja (ganancia ÷ publicidad)</td><Td n>{t.meta > 0 ? (t.ganancia / t.meta).toFixed(2) : '—'}</Td><Td n>{anterior && anterior.total.meta > 0 ? (anterior.total.ganancia / anterior.total.meta).toFixed(2) : '—'}</Td></tr>,
+            <tr key="a"><td>ROAS de caja (ganancia ÷ publicidad)</td><Td n>{t.meta > 0 ? (t.ganancia / t.meta).toFixed(2).replace('.', ',') : '—'}</Td><Td n>{anterior && anterior.total.meta > 0 ? (anterior.total.ganancia / anterior.total.meta).toFixed(2).replace('.', ',') : '—'}</Td></tr>,
             <tr key="b"><td>Publicidad por pedido pagado</td><Td n>{t.meta > 0 && t.entregas > 0 ? cop(t.meta / t.entregas) : '—'}</Td><Td n>{anterior && anterior.total.meta > 0 && anterior.total.entregas > 0 ? cop(anterior.total.meta / anterior.total.entregas) : '—'}</Td></tr>,
             <tr key="c"><td>Margen (te quedó ÷ entró)</td><Td n>{pct(c.neto, t.ganancia)}</Td><Td n>{anterior ? pct(anterior.neto, anterior.total.ganancia) : '—'}</Td></tr>,
             <tr key="d"><td>Devolución real vs esperada ({d.pctDevolucion} %)</td><Td n>{c.tasaDevolucion != null ? c.tasaDevolucion + ' %' : '—'}</Td><Td n>{anterior && anterior.tasaDevolucion != null ? anterior.tasaDevolucion + ' %' : '—'}</Td></tr>,

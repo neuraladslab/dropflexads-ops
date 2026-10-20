@@ -72,7 +72,7 @@ export default function ConfigIA({ estado }) {
 
       <div className="card">
         <div className="kpi-l">Gasto de este mes</div>
-        <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--mono)' }}>US$ {u.usd.toFixed(2)} <span className="muted" style={{ fontSize: 14, fontWeight: 400 }}>de US$ {estado.config.topeUsd}</span></div>
+        <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--mono)' }}>US$ {u.usd.toFixed(2).replace('.', ',')} <span className="muted" style={{ fontSize: 14, fontWeight: 400 }}>de US$ {estado.config.topeUsd}</span></div>
         <div className="vz-prog" style={{ margin: '8px 0' }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Gasto del mes frente al tope"><div style={{ width: `${pct}%`, background: pct >= 90 ? 'var(--coral)' : pct >= 70 ? 'var(--gold)' : undefined }} /></div>
         <div className="muted" style={{ fontSize: 13 }}>{u.llamadas} consultas · {(u.tokensEntrada + u.tokensSalida).toLocaleString('es-CO')} tokens</div>
       </div>
