@@ -157,7 +157,7 @@ export function VistaDashboard({ d }) {
   const actual = base.cortes.find((c) => c.abierto) || base.cortes[0]
   return (
     <>
-      {!vacio && <PanelSalud s={base.salud} ritmo={base.ritmoPauta} titulo="1 · ¿Cuánto puedo retirar hoy?" />}
+      {!vacio && <PanelSalud s={base.salud} origen={base.origen} inicio={base.inicio} hoy={base.hoy} ritmo={base.ritmoPauta} titulo="1 · ¿Cuánto puedo retirar hoy?" />}
       {!vacio && actual && <ResumenPeriodo c={actual} per={{ tipo: 'corte', id: actual.id, abierto: actual.abierto }} hoy={base.hoy} titulo="2 · ¿Cómo voy en este corte?" enlace={{ href: '/contabilidad', texto: 'Ver el detalle del dinero' }} />}
 
       <div className="sec-head" style={{ margin: '0 0 12px' }}><h2>3 · ¿Cuándo recupero mi inversión?</h2></div>

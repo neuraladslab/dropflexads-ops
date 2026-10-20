@@ -397,13 +397,31 @@ test("escalado: reglas de la calculadora con entrega prudente", () => {
   assert.equal(reciente.veredicto, "vigilar"); assert.equal(reciente.checks?.find((c) => c.clave === "espera")?.ok, false);
 });
 
-import { periodoDe, listarPeriodos, resumenPorPeriodo, flujoPorPeriodo, diaCorteValido, diasTranscurridos } from "./periodos.ts";
+import { periodoDe, listarPeriodos, resumenPorPeriodo, flujoPorPeriodo, diaCorteValido, diasTranscurridos, FIN_DE_MES, textoCorte } from "./periodos.ts";
 test("periodos con corte el 12: el 12 cierra el periodo y el 13 abre el siguiente", () => {
   const ini = "2026-09-26";
   assert.deepEqual(periodoDe("2026-10-12", 12, ini, "2026-10-19"), { id: "2026-10-12", desde: "2026-09-26", hasta: "2026-10-12", abierto: false });
   assert.deepEqual(periodoDe("2026-10-13", 12, ini, "2026-10-19"), { id: "2026-11-12", desde: "2026-10-13", hasta: "2026-11-12", abierto: true });
   assert.equal(periodoDe("2026-12-20", 12, ini, "2026-12-20").hasta, "2027-01-12"); // cruza el año
   assert.equal(periodoDe("2027-03-01", 12, "2026-01-01", "2027-03-01").desde, "2027-02-13");
+});
+test("corte «último día del mes»: cada periodo es un mes calendario, con febrero (también bisiesto) y el cambio de año, sin huecos ni repeticiones", () => {
+  assert.equal(diaCorteValido(FIN_DE_MES), true); assert.equal(diaCorteValido(29), false); assert.equal(diaCorteValido(30), false);
+  assert.equal(textoCorte(31), "último día del mes"); assert.equal(textoCorte(12), "12");
+  const l = listarPeriodos("2026-09-26", "2027-03-05", FIN_DE_MES);
+  assert.deepEqual(l.map((p) => [p.desde, p.hasta]), [["2026-09-26", "2026-09-30"], ["2026-10-01", "2026-10-31"], ["2026-11-01", "2026-11-30"], ["2026-12-01", "2026-12-31"], ["2027-01-01", "2027-01-31"], ["2027-02-01", "2027-02-28"], ["2027-03-01", "2027-03-31"]]);
+  for (let i = 1; i < l.length; i++) assert.equal(sumarDias(l[i - 1].hasta, 1), l[i].desde); // sin huecos ni días repetidos
+  assert.equal(periodoDe("2028-02-10", FIN_DE_MES, "2026-01-01", "2028-02-10").hasta, "2028-02-29"); // bisiesto
+  assert.equal(periodoDe("2028-02-29", FIN_DE_MES, "2026-01-01", "2028-03-05").hasta, "2028-02-29");
+  assert.equal(periodoDe("2028-03-01", FIN_DE_MES, "2026-01-01", "2028-03-05").desde, "2028-03-01");
+  assert.equal(periodoDe("2026-04-30", FIN_DE_MES, "2026-01-01", "2026-05-02").hasta, "2026-04-30"); // el último día es del periodo
+  assert.equal(periodoDe("2026-05-01", FIN_DE_MES, "2026-01-01", "2026-05-02").hasta, "2026-05-31");
+  assert.equal(listarPeriodos("2026-09-26", "2026-09-30", FIN_DE_MES).length, 1);
+  assert.equal(listarPeriodos("2026-09-26", "2026-10-01", FIN_DE_MES).length, 2);
+});
+test("cortes fijos no cambian con la nueva opción (corte 12 y 28)", () => {
+  assert.deepEqual(listarPeriodos("2026-09-26", "2027-03-05", 12).map((p) => p.hasta), ["2026-10-12", "2026-11-12", "2026-12-12", "2027-01-12", "2027-02-12", "2027-03-12"]);
+  assert.deepEqual(listarPeriodos("2026-09-26", "2027-03-05", 28).map((p) => [p.desde, p.hasta]).slice(0, 3), [["2026-09-26", "2026-09-28"], ["2026-09-29", "2026-10-28"], ["2026-10-29", "2026-11-28"]]);
 });
 test("listarPeriodos: del inicio de la operación al periodo de hoy, sin huecos", () => {
   const l = listarPeriodos("2026-09-26", "2026-10-19", 12);

@@ -696,7 +696,7 @@ a.ni{text-decoration:none}
 .ayuda{position:relative;display:inline-flex;vertical-align:middle;margin-left:6px}
 .ayuda-btn{width:20px;height:20px;border-radius:50%;border:1px solid var(--line2);background:var(--panel);color:#64748B;font:700 12px var(--sans);display:grid;place-items:center;cursor:pointer;padding:0;line-height:1}
 .ayuda-btn:hover,.ayuda-btn[aria-expanded="true"]{background:var(--blue-soft);color:var(--blue);border-color:var(--blue-line)}
-.ayuda-pop{position:absolute;z-index:40;top:26px;left:-8px;width:min(320px,80vw);display:flex;flex-direction:column;gap:6px;background:#0F172A;color:#fff;border-radius:14px;padding:14px 16px;font:500 13.5px/1.45 var(--sans);box-shadow:0 12px 32px rgba(15,23,42,.28);text-align:left;font-weight:500}
+.ayuda-pop{white-space:normal;overflow-wrap:anywhere;position:absolute;z-index:40;top:26px;left:-8px;width:min(320px,80vw);display:flex;flex-direction:column;gap:6px;background:#0F172A;color:#fff;border-radius:14px;padding:14px 16px;font:500 13.5px/1.45 var(--sans);box-shadow:0 12px 32px rgba(15,23,42,.28);text-align:left;font-weight:500}
 .ayuda-pop b{font-weight:700}
 .ayuda-pop .ayuda-f{opacity:.8;font-size:12.5px}
 .ayuda-pop .link{color:#93C5FD;font-weight:600}
@@ -755,3 +755,53 @@ details.vz-det[open]>summary::before{content:"▾ "}
 .ia-form{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel)}
 .ia-msgs .card{box-shadow:none}
 @media (max-width:640px){.ia-panel{right:8px;left:8px;width:auto;bottom:84px;height:calc(100vh - 110px)}.ia-fab{right:14px;bottom:14px}}
+/* ---------- Salud de la billetera: monto grande, billetera visible, lo que les toca y tarjetas por socio ---------- */
+.sal-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:12px;margin-top:12px}
+.sal-tile{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:var(--panel)}
+.sal-main{background:var(--surface)}
+.sal-prog{display:flex;gap:3px;height:16px;border-radius:999px;overflow:hidden;margin-top:6px}
+.sal-prog>div{min-width:6px}
+.sal-prog-l{display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;font-size:14px;margin-top:8px}
+.sal-prog-l i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.sal-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.sal-mini{border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:grid;gap:2px}
+.sal-mini b{font-family:var(--mono);font-size:21px;letter-spacing:-.01em}
+.sal-proy{background:var(--gold-soft);border-color:var(--gold-line)}
+@media (max-width:720px){.sal-grid{grid-template-columns:1fr}.vz-hero{font-size:38px}}
+.sal-eq{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin-top:10px}
+.sal-eq>i{align-self:center;font-style:normal;font-size:22px;font-weight:700;color:var(--muted)}
+.sal-eq-b{flex:1 1 150px;border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:grid;gap:2px;background:var(--panel)}
+.sal-eq-b span{font-size:12.5px;color:var(--muted);font-weight:600}
+.sal-eq-b b{font-family:var(--mono);font-size:20px}
+.sal-eq-ok{background:var(--jade-soft);border-color:var(--jade-line)}
+.sal-piso{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.sal-piso li{display:flex;gap:10px;align-items:flex-start}
+.sal-piso li>i{flex:none;width:12px;height:12px;border-radius:4px;margin-top:5px}
+.sal-piso li span{display:grid;font-size:14px}.sal-piso li em{font-style:normal;color:var(--muted);font-size:13px}
+@media (max-width:720px){.sal-eq>i{display:none}}
+/* La ayuda dentro de una etiqueta se ancla a la etiqueta (no al «?»), para que el globo no se salga de la pantalla */
+.sal-prog-l .chip{position:relative}
+.sal-prog-l .chip .ayuda{position:static}
+.sal-prog-l .chip .ayuda-pop{left:0;top:calc(100% + 6px)}
+.sal-lim{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+.sal-lim-i{border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:grid;gap:2px}
+.sal-lim-i span{font-size:13px;color:var(--muted);font-weight:600}.sal-lim-i b{font-family:var(--mono);font-size:19px}
+.sal-lim-i.on{border-color:var(--jade);background:var(--jade-soft)}.sal-lim-i em{font-style:normal;font-size:12.5px;font-weight:700;color:var(--jade-ink)}
+.sal-pasos{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:18px}
+.sal-pasos>li{border-left:3px solid var(--line2);padding-left:14px}
+.sal-pasos h4{margin:0 0 4px;font-size:15.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sal-pasos h4 i{width:22px;height:22px;border-radius:999px;background:var(--blue);color:#fff;font-style:normal;font-size:12.5px;font-weight:800;display:grid;place-items:center}
+.sal-pasos h4 span{font-weight:500;font-size:13px;color:var(--muted)}
+.sal-pasos .muted{font-size:13.5px;margin:8px 0 0}
+.sal-cta{display:grid;margin-top:6px}
+.sal-cta-f{display:flex;justify-content:space-between;gap:16px;align-items:baseline;padding:8px 2px;border-bottom:1px dashed var(--line2);font-size:14.5px}
+.sal-cta-f span{display:grid;gap:1px;min-width:0}.sal-cta-f small{font-size:12.5px;color:var(--muted);font-weight:500}
+.sal-cta-f em{font-style:normal;color:var(--muted);margin-right:4px}
+.sal-cta-f .v{font-family:var(--mono);white-space:nowrap}
+.sal-cta-f.tot{border-bottom:0;border-top:2px solid var(--ink);margin-top:2px;padding-top:10px;font-size:16px}
+.sal-cta-f.tot .v{font-size:18px;color:var(--jade-ink)}
+.sal-rango{background:var(--blue-soft);border:1px solid var(--blue-line);border-radius:12px;padding:9px 14px;font-size:13.5px;margin-top:10px}
+.sal-pasos>li{border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:14px;padding:14px 16px;background:var(--surface)}
+.sal-eq-b small{font-size:12px;color:var(--muted)}
+.sal-fin{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;padding:12px 16px;border-radius:12px;background:var(--jade-soft);border:1px solid var(--jade-line)}
+.sal-fin span{font-weight:700}.sal-fin b{font-family:var(--mono);font-size:26px;color:var(--jade-ink)}
