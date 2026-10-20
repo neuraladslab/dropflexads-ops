@@ -466,8 +466,12 @@ export async function datosCortes(uid, m = new Map()) {
     ritmoPauta: pauta.ritmo, deudaMeta: deudaMeta(gastosPauta, cobrosMeta, hoy), costoDevolucionesEsperado: devPend, gananciaEsperada: gananciaPend,
     diasPago: diasPagoGlobal, hoy, destinos: rep.destinos, cuadreMalo: hoyC.chequeos.some((x) => x.tono === 'bad'), datosViejos: viejo(cd) || viejo(cm),
   })
+  // De dónde sale la ganancia neta acumulada: lo que Dropi pagó menos cada gasto real, sumado en todos los cortes (así cuadra con la utilidad acumulada).
+  const sumar = (f) => Math.round(res.reduce((a, r) => a + f(r), 0) * 100) / 100
+  const origen = { ingresos: sumar((r) => r.total.ganancia), publicidad: sumar((r) => r.total.meta), devoluciones: sumar((r) => r.total.devoluciones), comisiones: sumar((r) => r.total.comisiones),
+    otros: sumar((r) => r.total.otrosDescuentos + r.total.otrosGastos), herramientas: sumar((r) => r.herramientas + r.total.pagosHerramientas), neto: acumulado }
   cortes.reverse()
-  return { generado: Date.now(), corte, inicio, hoy, cortes, salud, ritmoPauta: pauta, retiradoTotal: Math.round(retirado * 100) / 100, utilidadRetenida: Math.max(0, Math.round((acumulado - retirado) * 100) / 100), saldoBilletera: b.saldo, saldoTarjeta: tar.tarjetaDropi ? tar.tarjetaDropi.saldo : null, herramientasPorDia: g.herramientasPorDia, reparto: { destinos: rep.destinos, propio: rep.propio }, pctDevolucion: pctEsperado, cierresListos: tablaCierres }
+  return { generado: Date.now(), corte, inicio, hoy, cortes, salud, origen, ritmoPauta: pauta, retiradoTotal: Math.round(retirado * 100) / 100, utilidadRetenida: Math.max(0, Math.round((acumulado - retirado) * 100) / 100), saldoBilletera: b.saldo, saldoTarjeta: tar.tarjetaDropi ? tar.tarjetaDropi.saldo : null, herramientasPorDia: g.herramientasPorDia, reparto: { destinos: rep.destinos, propio: rep.propio }, pctDevolucion: pctEsperado, cierresListos: tablaCierres }
 }
 
 /**

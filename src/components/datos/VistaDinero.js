@@ -31,7 +31,7 @@ export function VistaDinero({ d }) {
     <>
       {!base.cierresListos && <Aviso tono="warn" titulo="Falta una actualización de la base de datos">Aplícala con <code>npm run db:migrate</code> para poder sellar cortes.</Aviso>}
 
-      <PanelSalud s={base.salud} ritmo={base.ritmoPauta} titulo="Hoy: ¿cuánto puedo retirar?" />
+      <PanelSalud s={base.salud} origen={base.origen} inicio={base.inicio} hoy={base.hoy} ritmo={base.ritmoPauta} titulo="Hoy: ¿cuánto puedo retirar?" />
       <div className="vz-tiles" style={{ marginBottom: 20 }}>
         <Tile l="Billetera" ayuda="saldo_billetera" v={caja.billetera == null ? '—' : cop(caja.billetera)} n="según el último movimiento" />
         <Tile l="Tarjeta" ayuda="saldo_tarjeta" v={caja.tarjeta ? cop(caja.tarjeta.monto) : '—'} n={caja.tarjeta ? `según Dropi, leído ${hace(caja.tarjeta.leido)}` : 'sincroniza Dropi'} />

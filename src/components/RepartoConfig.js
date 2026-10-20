@@ -32,13 +32,13 @@ export default function RepartoConfig({ inicial, propio }) {
     <form onSubmit={guardar} style={{ maxWidth: 860, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="card">
         <b>Cómo se reparte la utilidad de cada corte<Ayuda t="reparto" /></b>
-        <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>Los ingresos de tu billetera (lo que Dropi te paga) cubren primero los gastos reales: publicidad, devoluciones, comisiones y herramientas. Lo que queda es la <b>utilidad</b>, y estos porcentajes la dividen. Lo que no es de las socias se queda en la billetera.</p>
+        <p className="muted" style={{ margin: '6px 0 0', fontSize: 14 }}>Los ingresos de tu billetera (lo que Dropi te paga) cubren primero los gastos reales: publicidad, devoluciones, comisiones y herramientas. Lo que queda es la <b>utilidad</b>, y estos porcentajes la dividen. Lo que no es de los socios se queda en la billetera.</p>
         <div className="only-learner" style={{ fontSize: 14, marginTop: 10, display: 'grid', gap: 6 }}>
           <div><b>Piso de liquidez (no es un porcentaje):</b> antes de retirar, la billetera debe poder pagar 7 días de pauta al ritmo real de Meta, lo que Meta ya gastó y aún no cobra, y las devoluciones esperadas.</div>
           <div><b>Reinversión extra en pauta (≈25 %):</b> la parte de la utilidad que vuelve a pauta para crecer. Ya cuenta dentro del piso de 7 días: no se aparta aparte.</div>
           <div><b>Reserva de imprevistos (≈10 %), ahorro (≈10 %) e impuestos (≈5 %):</b> se quedan en la billetera hasta que los muevas a otra cuenta. Si los sacas, cuentan como retiros.</div>
           <div><b>Sobre los impuestos:</b> el 5 % es un marcador. Depende de tu régimen (Simple se calcula sobre ingresos brutos; el ordinario, sobre la utilidad) y de si el IVA de Meta es descontable: pregunta a tu contador.</div>
-          <div><b>Socias (el resto, ≈50 %):</b> lo único que se retira. Se divide como acuerden; aquí quedó mitad y mitad.</div>
+          <div><b>Socios (el resto, ≈50 %):</b> lo único que se retira. Se divide como acuerden; aquí quedó mitad y mitad.</div>
         </div>
       </div>
 

@@ -1,8 +1,8 @@
 // Salud de la billetera: ¿cuánto se puede retirar de ganancia neta, y cuándo? Una sola cuenta, con los mismos números del resto del sistema.
 //  1. La utilidad neta es lo que queda de los ingresos de la billetera (lo que Dropi paga) después de los gastos REALES. Se acumula corte a corte y no es negativa (las pérdidas se recuperan primero).
 //  2. La billetera debe conservar un PISO de liquidez: publicidad de 7 días con el ritmo real de Meta + lo que Meta ya gastó y aún no cobra − lo que tiene la tarjeta, más el costo esperado de devoluciones.
-//  3. La utilidad se divide con los porcentajes. Lo que no es de las socias (reinversión extra, reserva, ahorro, impuestos) se queda en la billetera y también cuenta como piso.
-//  4. Lo que se puede retirar es lo MENOR entre: lo que les toca a las socias y aún no han retirado, lo que sobra en la billetera sobre el piso, y la ganancia neta que sigue dentro de la operación
+//  3. La utilidad se divide con los porcentajes. Lo que no es de los socios (reinversión extra, reserva, ahorro, impuestos) se queda en la billetera y también cuenta como piso.
+//  4. Lo que se puede retirar es lo MENOR entre: lo que les toca a los socios y aún no han retirado, lo que sobra en la billetera sobre el piso, y la ganancia neta que sigue dentro de la operación
 //     (utilidad acumulada − retiros). Así nunca se retira capital, aportes ni plata que aún recupera la inversión.
 import { repartirUtilidad, type Destino, type FilaReparto } from "./reparto.ts";
 import { sumarDias } from "./fechas.ts";
@@ -62,14 +62,14 @@ export function evaluarSalud(e: EntradaSalud): Salud {
     seQueda: c.seQueda, bloqueado: c.bloqueado, libre: c.libre, utilidadRetenida: c.retenida, sociasAcumulado: c.socias, retirado: r2(e.retirado), sociasPorRetirar: c.porRetirar, retiroSeguro: c.retiro, limitadoPor: c.lim, proyeccion,
   };
   if (e.cuadreMalo) return { estado: "rojo", titulo: "No retires todavía: las cifras no cuadran", detalle: "La billetera no cuadra con sus movimientos. Sincroniza Dropi de nuevo y revisa los avisos del corte antes de sacar plata.", ...base };
-  if (!e.destinos.some((d) => d.tipo === "socio" && d.pct > 0)) return { estado: "gris", titulo: "No hay socias en el reparto", detalle: "Agrega al menos un destino de tipo «Socio/a» con porcentaje en Configuración → Reparto.", ...base };
+  if (!e.destinos.some((d) => d.tipo === "socio" && d.pct > 0)) return { estado: "gris", titulo: "No hay socios en el reparto", detalle: "Agrega al menos un destino de tipo «Socio/a» con porcentaje en Configuración → Reparto.", ...base };
   if (c.retiro <= 0) {
     if (c.libre <= 0) return { estado: "rojo", titulo: "No retires: la billetera no cubre lo que debe quedarse", detalle: `Deben quedar ${cop(c.bloqueado)} (pauta de ${DIAS_PAUTA} días, devoluciones y lo que se queda de la utilidad) y hay ${cop(e.saldoBilletera)}.`, ...base };
     if (c.util <= 0) return { estado: "gris", titulo: "Todavía no hay ganancia neta para retirar", detalle: "Lo que hay en la billetera aún recupera la inversión: la utilidad acumulada es cero.", ...base };
-    return { estado: "gris", titulo: "No hay nada pendiente de retirar", detalle: "Ya retiraste lo que les tocaba a las socias con la utilidad acumulada hasta hoy.", ...base };
+    return { estado: "gris", titulo: "No hay nada pendiente de retirar", detalle: "Ya retiraste lo que les tocaba a los socios con la utilidad acumulada hasta hoy.", ...base };
   }
-  const motivo = c.lim === "utilidad" ? "es toda la ganancia neta que queda en la operación" : c.lim === "necesidades" ? "es lo que sobra sobre el piso de liquidez" : "es lo que les toca a las socias y aún no han retirado";
+  const motivo = c.lim === "utilidad" ? "es toda la ganancia neta que queda en la operación" : c.lim === "necesidades" ? "es lo que sobra sobre el piso de liquidez" : "es lo que les toca a los socios y aún no han retirado";
   const cautela = e.datosViejos ? " Dropi o Meta llevan más de un día sin sincronizar: sincroniza antes de retirar." : "";
-  if (c.lim === "plan" && !e.datosViejos) return { estado: "verde", titulo: `Puedes retirar hasta ${cop(c.retiro)}`, detalle: `Es lo que les toca a las socias y la billetera cubre el piso de liquidez.${cautela}`, ...base };
+  if (c.lim === "plan" && !e.datosViejos) return { estado: "verde", titulo: `Puedes retirar hasta ${cop(c.retiro)}`, detalle: `Es lo que les toca a los socios y la billetera cubre el piso de liquidez.${cautela}`, ...base };
   return { estado: "amarillo", titulo: `Retira como máximo ${cop(c.retiro)}`, detalle: `Ese monto ${motivo}.${cautela}`, ...base };
 }
