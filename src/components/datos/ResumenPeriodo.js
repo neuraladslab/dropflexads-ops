@@ -36,8 +36,8 @@ export function ResumenPeriodo({ c, per, hoy, enlace, titulo }) {
       </div>
 
       <div style={{ marginTop: 20 }}>
-        <BarraApilada titulo="¿A dónde se fue lo que entró?" total={c.total.ganancia} segmentos={segmentos} marca={marca} />
-        <p className="muted only-learner" style={{ fontSize: 13.5, margin: '10px 0 0' }}>«Entró» es lo que Dropi ya pagó a tu billetera. Un periodo puede verse flojo aunque sus ventas sean buenas si Dropi las paga en el siguiente.<Ayuda t="caja_venta" /></p>
+        <BarraApilada plegable="rp-leg" titulo="¿A dónde se fue lo que entró?" total={c.total.ganancia} segmentos={segmentos} marca={marca} />
+        <p className="muted only-learner m-oculto" style={{ fontSize: 13.5, margin: '10px 0 0' }}>«Entró» es lo que Dropi ya pagó a tu billetera. Un periodo puede verse flojo aunque sus ventas sean buenas si Dropi las paga en el siguiente.<Ayuda t="caja_venta" /></p>
       </div>
       {enlace && <div style={{ marginTop: 14 }}><Link href={enlace.href} className="btn sm">{enlace.texto}</Link></div>}
     </section>

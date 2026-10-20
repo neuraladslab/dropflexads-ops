@@ -33,7 +33,7 @@ export function VistaDinero({ d }) {
 
       <PanelSalud s={base.salud} origen={base.origen} inicio={base.inicio} hoy={base.hoy} ritmo={base.ritmoPauta} titulo="Hoy: ¿cuánto puedo retirar?" />
       <div className="vz-tiles" style={{ marginBottom: 20 }}>
-        <Tile l="Billetera" ayuda="saldo_billetera" v={caja.billetera == null ? '—' : cop(caja.billetera)} n="según el último movimiento" />
+        <Tile cls="m-oculto" l="Billetera" ayuda="saldo_billetera" v={caja.billetera == null ? '—' : cop(caja.billetera)} n="según el último movimiento" />
         <Tile l="Tarjeta" ayuda="saldo_tarjeta" v={caja.tarjeta ? cop(caja.tarjeta.monto) : '—'} n={caja.tarjeta ? `según Dropi, leído ${hace(caja.tarjeta.leido)}` : 'sincroniza Dropi'} />
         <Tile l="Pedidos entregados" v={fmtN(caja.entregados.n)} n={`por ${cop(caja.entregados.valor)} en total`} />
       </div>
@@ -48,7 +48,7 @@ export function VistaDinero({ d }) {
             {!d.hayCobros && <Aviso tono="warn" titulo="Sin cobros de Meta cargados">La publicidad aparece dentro de «otros gastos de la tarjeta». Cuando se conecte Meta se separa.</Aviso>}
             <div className="card">
               {desglose.length === 0 ? <p className="muted" style={{ margin: 0 }}>Sin gastos en este periodo.</p> : desglose.map((f) => (
-                <div key={f.nombre} className="rowline" style={{ alignItems: 'center' }}>
+                <div key={f.nombre} className="rowline rl-nota" style={{ alignItems: 'center' }}>
                   <span>{f.nombre}</span>
                   <span style={{ display: 'inline-flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <span className="muted" style={{ fontSize: 13 }}>{f.pctDelCosto} % de lo que gastaste{f.pctDeLaGanancia != null ? ` · ${f.pctDeLaGanancia} % de lo que entró` : ''}</span>

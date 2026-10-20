@@ -9,6 +9,7 @@ import { PanelIA } from '@/components/ia/PanelIA'
 
 // «Escalar» con probabilidades: qué presupuesto diario conviene, cuánta plata se pone en juego, en cuántos pasos llegar y cuándo frenar. Todos los números salen del motor
 // (src/domain/escalado.ts, determinista y con pruebas); aquí solo se muestran. Modo Aprendiz: explica cada bloque. Avanzado: agrega los parámetros estimados.
+const coma = (v) => String(v).replace('.', ',')
 const pc = (x) => `${Math.round(x * 100)} %`
 const sg = (n) => (n < 0 ? '−' : '+') + cop(Math.abs(n))
 const Seccion = ({ titulo, ayuda, children }) => <section style={{ marginTop: 24 }}><div className="sec-head" style={{ marginTop: 0 }}><h2>{titulo}{ayuda && <Ayuda t={ayuda} />}</h2></div>{children}</section>
@@ -41,7 +42,7 @@ export function VistaEscalado({ d, s, nombre, tieneIA = false }) {
 
       <div className={'tint ' + tono} style={{ marginBottom: 16 }}>
         {a.accion === 'escalar' && rec && <>
-          <b style={{ fontSize: 24, color: 'var(--jade-ink)' }}>Sube a {cop(rec.presupuesto)} por día ({rec.cambioPct > 0 ? '+' : ''}{rec.cambioPct} %)</b>
+          <b style={{ fontSize: 24, color: 'var(--jade-ink)' }}>Sube a {cop(rec.presupuesto)} por día ({rec.cambioPct > 0 ? '+' : ''}{coma(rec.cambioPct)} %)</b>
           <div style={{ fontSize: 15, marginTop: 6 }}>Probabilidad de ganar en los próximos 7 días: <b>{pc(rec.pGanar)}</b>. Peor caso razonable: <b>{sg(rec.p5)}</b> · caso mediano <b>{sg(rec.mediana)}</b> · mejor caso <b>{sg(rec.p90)}</b>.<Ayuda t="prob_ganar" /></div>
           <div style={{ fontSize: 14.5, marginTop: 6 }}>No lo cambies de nuevo durante <b>{a.riesgo.esperaDias} días</b>. {a.ruta.length > 1 ? <>Si pasan sin alertas, el siguiente paso es <b>{cop(a.ruta[1].presupuesto)}</b>, y {a.objetivo ? <>puedes llegar hasta unos <b>{cop(a.objetivo.presupuesto)}</b> por día con tu billetera.</> : 'así hasta el objetivo.'}</> : a.objetivo && a.objetivo.presupuesto > rec.presupuesto ? <>Tu billetera aguanta hasta unos <b>{cop(a.objetivo.presupuesto)}</b> por día.</> : null}</div>
         </>}
@@ -58,7 +59,7 @@ export function VistaEscalado({ d, s, nombre, tieneIA = false }) {
 
       <Seccion titulo="Compara presupuestos" ayuda="peor_caso">
         <ProbarPresupuesto valor={s && !a.escenarios.some((e) => e.presupuesto === s && e.esActual) ? s : null} />
-        <div className="card tbl-card"><div className="scroll-x"><table className="tbl" style={{ minWidth: 760 }}>
+        <div className="card tbl-card"><div className="scroll-x"><table className="tbl tbl-esc" style={{ minWidth: 760 }}>
           <thead><tr>
             <th>Presupuesto por día<div className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>sin IVA · con IVA</div></th><th>Cambio</th><th>Prob. de ganar<Ayuda t="prob_ganar" /></th><th>Peor caso</th><th>Mediano</th><th>Mejor caso</th>
             <th className="only-pro">Pedidos/día</th><th className="only-pro">Costo por pedido</th><th className="only-pro">Sobra en la billetera</th><th className="only-pro">Retiro posible</th><th>¿Hacerlo?</th>
@@ -67,7 +68,7 @@ export function VistaEscalado({ d, s, nombre, tieneIA = false }) {
             {a.escenarios.map((e) => (
               <tr key={e.presupuesto} className="row" style={{ background: rec && e.presupuesto === rec.presupuesto ? 'var(--jade-soft)' : sel && e.presupuesto === sel.presupuesto && !(rec && e.presupuesto === rec.presupuesto) ? 'var(--blue-soft)' : undefined }}>
                 <td><b>{cop(e.presupuesto)}</b>{rec && e.presupuesto === rec.presupuesto && <span className="chip ok" style={{ marginLeft: 8 }}>Recomendado</span>}<div className="muted" style={{ fontSize: 12 }}>con IVA {cop(e.presupuesto * (1 + d.resumen.vat / 100))}</div></td>
-                <td>{e.esActual ? '—' : (e.cambioPct > 0 ? '+' : '') + e.cambioPct + ' %'}</td>
+                <td>{e.esActual ? '—' : (e.cambioPct > 0 ? '+' : '') + coma(e.cambioPct) + ' %'}</td>
                 <td><b>{pc(e.pGanar)}</b></td><td style={{ color: e.p5 < 0 ? 'var(--coral-ink)' : undefined }}>{sg(e.p5)}</td><td>{sg(e.mediana)}</td><td style={{ color: 'var(--jade-ink)' }}>{sg(e.p90)}</td>
                 <td className="only-pro">{e.pedidosDia.toFixed(1).replace('.', ',')}</td><td className="only-pro">{e.cpa ? cop(e.cpa) : '—'}</td><td className="only-pro" style={{ color: e.liquidez.libre < 0 ? 'var(--coral-ink)' : undefined }}>{cop(e.liquidez.libre)}</td><td className="only-pro">{cop(e.liquidez.retiroResultante)}</td>
                 <td><Veredicto e={e} />{!e.aprobado && !e.esActual && e.motivos.length > 0 && <div className="muted" style={{ fontSize: 11.5, marginTop: 4, maxWidth: 230, whiteSpace: 'normal' }}>{e.motivos[0]}</div>}</td>
@@ -88,7 +89,7 @@ export function VistaEscalado({ d, s, nombre, tieneIA = false }) {
           </div>
           <div className="card"><AbanicoResultados abanico={sel.abanico} /></div>
           <p style={{ fontSize: 14.5, margin: '12px 0 0' }}>
-            <b>Billetera:</b> a ese ritmo deben quedar {cop(sel.liquidez.pisoPauta)} para 7 días de pauta; te sobran <b style={{ color: sel.liquidez.libre < 0 ? 'var(--coral-ink)' : undefined }}>{cop(sel.liquidez.libre)}</b> y lo que podrían retirar las socias pasaría de {cop(d.saludHoy.retiroSeguro)} a <b>{cop(sel.liquidez.retiroResultante)}</b>.
+            <b>Billetera:</b> a ese ritmo deben quedar {cop(sel.liquidez.pisoPauta)} para 7 días de pauta; te sobran <b style={{ color: sel.liquidez.libre < 0 ? 'var(--coral-ink)' : undefined }}>{cop(sel.liquidez.libre)}</b> y lo que podrían retirar los socios pasaría de {cop(d.saludHoy.retiroSeguro)} a <b>{cop(sel.liquidez.retiroResultante)}</b>.
           </p>
         </Seccion>
       )}
@@ -99,7 +100,7 @@ export function VistaEscalado({ d, s, nombre, tieneIA = false }) {
             {a.ruta.map((p) => (
               <div key={p.orden} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}>
                 <span className="chip blue">{p.orden === 1 ? 'Hoy' : `Día ${p.desdeDia}`}</span>
-                <b>{cop(p.presupuesto)} por día</b><span className="muted">(+{p.cambioPct} %) · {pc(p.pGanar)} de ganar</span>
+                <b>{cop(p.presupuesto)} por día</b><span className="muted">(+{coma(p.cambioPct)} %) · {pc(p.pGanar)} de ganar</span>
                 <span className="muted" style={{ fontSize: 13 }}>{p.condicion}</span>
               </div>
             ))}

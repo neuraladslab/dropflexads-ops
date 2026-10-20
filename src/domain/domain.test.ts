@@ -746,3 +746,22 @@ test("creativos: el enlace de Drive solo acepta https de Google", () => {
   assert.equal(driveUrlLimpia("  https://docs.google.com/document/d/xyz  "), "https://docs.google.com/document/d/xyz");
   for (const malo of ["http://drive.google.com/x", "https://evil.com/drive.google.com", "https://drive.google.com.evil.com/x", "javascript:alert(1)", "https://user:pw@drive.google.com/x", "", "x".repeat(600), 5, null]) assert.equal(driveUrlLimpia(malo), null, String(malo).slice(0, 30));
 });
+
+test("salud: las cifras derivadas salen del dominio y cuadran con el resto (las pantallas no calculan)", () => {
+  const x = salud({ saldoBilletera: 937946, utilidadAcumulada: 428316, retirado: 0, costoDevolucionesEsperado: 81908, ritmoPauta: 84859 });
+  const d = x.derivadas;
+  assert.equal(d.pctSocios, 50); assert.equal(d.porSocio.length, 2);
+  assert.equal(d.retirableDeLoQueLesToca + d.pendiente, x.sociasPorRetirar); // lo retirable + lo pendiente = lo que les toca
+  assert.equal(d.retirableDeLoQueLesToca, x.retiroSeguro);
+  assert.equal(d.saldoParaRetirarTodo, Math.round((x.bloqueado + x.sociasPorRetirar) * 100) / 100);
+  assert.equal(d.faltaParaRetirarTodo, Math.max(0, Math.round((d.saldoParaRetirarTodo - (x.saldo ?? 0)) * 100) / 100));
+  assert.equal(d.bajoElMinimo, d.faltaParaRetirarTodo); // sin retiros previos, retirar todo deja la billetera justo esa cantidad por debajo del mínimo
+  assert.ok(Math.abs(d.porSocio.reduce((a, f) => a + f.monto, 0) - x.retiroSeguro) <= d.porSocio.length); // el retiro partido suma lo mismo (±redondeo)
+  assert.equal(d.seQuedaEnOperacion + x.sociasAcumulado, x.utilidadAcumulada); // la utilidad se reparte completa: socios + lo que se queda
+  assert.equal(d.pctRetirable, x.sociasPorRetirar > 0 ? Math.round((d.retirableDeLoQueLesToca / x.sociasPorRetirar) * 100) : 0);
+  // si la billetera alcanza para todo, no hay pendiente ni falta nada
+  const sobra = salud({ saldoBilletera: 5000000, utilidadAcumulada: 428316, retirado: 0, ritmoPauta: 84859 }).derivadas;
+  assert.equal(sobra.pendiente, 0); assert.equal(sobra.faltaParaRetirarTodo, 0); assert.equal(sobra.pctRetirable, 100);
+  // sin saldo no se inventa nada
+  const sin = salud({ saldoBilletera: null as never }).derivadas; assert.equal(sin.porSocio.length, 0); assert.equal(sin.pctRetirable, 0);
+});

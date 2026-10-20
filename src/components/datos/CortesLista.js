@@ -91,7 +91,7 @@ export function CortesLista({ cortes }) {
         <span className="muted">Te quedó <Neto n={sumaNeto} /></span>
       </div>}
 
-      <div className="card tbl-card" style={{ marginBottom: 16 }}><div className="scroll-x"><table className="tbl" style={{ minWidth: 720 }}>
+      <div className="card tbl-card" style={{ marginBottom: 16 }}><div className="scroll-x"><table className="tbl tbl-cortes" style={{ minWidth: 720 }}>
         <thead><tr>
           <th>Corte<Ayuda t="corte" /></th><th>Entró</th><th>Gastos</th><th>Te quedó</th>
           <th className="only-pro">vs anterior</th><th className="only-pro">Por cobrar (est.)</th><th className="only-pro">Retiros</th><th className="only-pro">Saldo al cerrar</th><th>Informe</th>

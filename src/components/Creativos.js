@@ -99,7 +99,7 @@ function Resumen({ titulo, filas, nombre }) {
   if (!filas.length) return null
   return (
     <div className="card tbl-card"><div style={{ padding: '14px 16px 4px', fontWeight: 700 }}>{titulo}</div>
-      <div className="scroll-x"><table className="tbl"><thead><tr><th>{nombre}</th><th>Creativos</th><th>Funcionan</th><th>A refrescar</th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Costo por compra</th></tr></thead>
+      <div className="scroll-x"><table className="tbl tbl-res"><thead><tr><th>{nombre}</th><th>Creativos</th><th>Funcionan</th><th>A refrescar</th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Costo por compra</th></tr></thead>
         <tbody>{filas.map((f) => <tr key={f.clave}><td><b>{f.clave === 'video' || f.clave === 'imagen' ? FORMATOS[f.clave].nombre : f.clave}</b></td><td>{fmtN(f.creativos)}</td><td>{fmtN(f.funcionan)}</td><td>{fmtN(f.refrescar)}</td><td>{cop(f.gasto)}</td><td>{pct1(f.ctr)}</td><td>{f.cpc == null ? '—' : cop(f.cpc)}</td><td>{f.costoCompra == null ? '—' : cop(f.costoCompra)}</td></tr>)}</tbody></table></div></div>
   )
 }
@@ -140,7 +140,7 @@ export default function Creativos({ d }) {
       {lista.length === 0 ? (
         <div className="card"><p className="empty-note" style={{ margin: 0 }}>{d.creativos.length ? 'Ningún creativo coincide con los filtros.' : 'Aún no tienes creativos. Crea el primero: la app arma el nombre y tú lo usas igual en Meta y en Drive.'}</p></div>
       ) : (
-        <div className="card tbl-card"><div className="scroll-x"><table className="tbl">
+        <div className="cr-wrap"><div className="card tbl-card cr-tabla"><div className="scroll-x"><table className="tbl">
           <thead><tr><th>Creativo</th><th>Campaña / ángulo</th><th>Estado</th><th>Lectura</th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Compras</th><th></th></tr></thead>
           <tbody>{lista.map((c) => { const l = c.lectura, e = ETIQUETA[l.etiqueta]; return (
             <tr key={c.id}>
@@ -154,6 +154,30 @@ export default function Creativos({ d }) {
               <td>{l.gasto ? cop(l.gasto) : '—'}</td><td>{pct1(l.ctr)}</td><td>{l.cpc == null ? '—' : cop(l.cpc)}</td><td>{l.gasto ? fmtN(l.compras) : '—'}</td>
               <td style={{ whiteSpace: 'nowrap' }}>{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Drive</a>} <button type="button" className="btn ghost" style={{ padding: '4px 10px' }} onClick={() => setEditando(c)}>Editar</button></td>
             </tr>) })}</tbody></table></div></div>
+        {/* Celular: una tarjeta por creativo (la tabla no cabe) */}
+        <div className="cr-lista">
+          {lista.map((c) => { const l = c.lectura, e = ETIQUETA[l.etiqueta]; return (
+            <article key={c.id} className="card cr-card">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                <span className="cr-nombre">{c.nombre}</span><Copiar texto={c.nombre} />
+              </div>
+              <div className="muted" style={{ fontSize: 13 }}>{c.campana} · {c.angulo} · {FORMATOS[c.formato].nombre}</div>
+              {c.gancho && <div className="muted" style={{ fontSize: 12.5 }}>{c.gancho}</div>}
+              <div className="cr-fila">
+                <select className="sel" aria-label={`Estado de ${c.nombre}`} value={c.estado} onChange={(ev) => cambiarEstado(c, ev.target.value)}>{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.nombre}</option>)}</select>
+                <span className={'chip ' + e.tono}>{e.texto}</span>
+              </div>
+              <dl className="cr-datos">
+                <div><dt>Gasto (sin IVA)</dt><dd>{l.gasto ? cop(l.gasto) : '—'}</dd></div>
+                <div><dt>CTR</dt><dd>{pct1(l.ctr)}</dd></div>
+                <div><dt>Costo por clic</dt><dd>{l.cpc == null ? '—' : cop(l.cpc)}</dd></div>
+                <div><dt>Compras</dt><dd>{l.gasto ? fmtN(l.compras) : '—'}</dd></div>
+              </dl>
+              <details className="cr-por"><summary>Por qué esta lectura</summary><div style={{ fontSize: 13 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details>
+              {l.alertas.length > 0 && <div style={{ color: 'var(--gold-ink)', fontSize: 13 }}>⚠ No cuadra con Meta</div>}
+              <div className="cr-fila">{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Abrir en Drive</a>}<button type="button" className="btn ghost sm" onClick={() => setEditando(c)}>Editar</button></div>
+            </article>) })}
+        </div></div>
       )}
 
       {d.creativos.length > 0 && <div style={{ display: 'grid', gap: 14, marginTop: 20 }}><Resumen titulo="¿Qué ángulo rinde mejor?" nombre="Ángulo" filas={d.resumen.porAngulo} /><Resumen titulo="¿Video o imagen?" nombre="Formato" filas={d.resumen.porFormato} /></div>}

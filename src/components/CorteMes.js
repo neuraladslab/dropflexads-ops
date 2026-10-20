@@ -39,7 +39,7 @@ export default function CorteMes({ dia, hoy }) {
       
       </div>
       <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-        Cada corte cierra ese día (incluido) y el siguiente empieza al día siguiente. {fin ? 'Con corte el último día del mes, cada periodo va del 1 al último día de ese mes (28, 29, 30 o 31 según el mes).' : <>Con corte el {valido ? n : '…'}, un periodo va del {valido ? n + 1 : '…'} de un mes al {valido ? n : '…'} del siguiente.</>}
+        Cada corte cierra ese día (incluido) y el siguiente empieza al día siguiente. {fin ? 'Con corte el último día del mes, cada periodo va del 1 al último día de ese mes (28, 29, 30 o 31 según el mes).' : <>Con corte el {valido ? n : '…'}, un periodo va del {valido ? n + 1 : '…'} de un mes al {valido ? n : '…'} del siguiente.</>}{' '}
         Es solo una forma de agrupar: no se borra ni se oculta ningún dato, y puedes cambiarlo cuando quieras. Lo ves en Contabilidad → Cortes.
       </p>
       {proximos.length > 0 && <p style={{ margin: 0, fontSize: 14 }}><b>Próximos cierres:</b> {proximos.map((f) => diaCorto(f)).join(' · ')}</p>}

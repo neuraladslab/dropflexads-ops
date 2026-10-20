@@ -24,7 +24,7 @@ export default function TarjetaCombos({ c }) {
         <details className="md-flat md-sec" open style={{ marginTop: 14 }}>
           <summary>Lo vendido por combo <span className="md-sm">{fmtN(t.ventas)} {t.ventas === 1 ? 'venta' : 'ventas'} · {cop(t.gananciaTotal)} de ganancia real</span></summary>
           <div className="scroll-x">
-            <table className="tbl">
+            <table className="tbl tbl-combos">
               <thead><tr><th style={{ textAlign: 'left' }}>Combo</th><th>Precio actual</th><th>Ventas</th><th>% ventas</th><th>Facturado</th><th>Ganancia por venta</th><th>Ganancia total</th></tr></thead>
               <tbody>
                 {c.filas.map((f) => (

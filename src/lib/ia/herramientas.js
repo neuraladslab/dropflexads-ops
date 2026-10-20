@@ -10,7 +10,7 @@ const corto = (s, n = 280) => (typeof s === 'string' ? s.slice(0, n) : s)
 const ESTADOS = ['pagado', 'en_curso', 'sin_pagar', 'no_verificable', 'devuelto', 'devuelto_cobrado']
 
 export const DEFINICIONES = [
-  { name: 'obtener_salud_billetera', description: 'Estado de la billetera de Dropi HOY: saldo, cuánto pueden retirar las socias (retiro recomendado), lo que debe quedar (pauta de 7 días, devoluciones, imprevistos/ahorro/impuestos), utilidad acumulada y lo ya retirado. El retiro y la proyección son estimaciones sobre datos reales.', input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false } },
+  { name: 'obtener_salud_billetera', description: 'Estado de la billetera de Dropi HOY: saldo, cuánto pueden retirar los socios (retiro recomendado), lo que debe quedar (pauta de 7 días, devoluciones, imprevistos/ahorro/impuestos), utilidad acumulada y lo ya retirado. El retiro y la proyección son estimaciones sobre datos reales.', input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false } },
   { name: 'obtener_periodo', description: 'Resumen del dinero de un periodo: Entró, Gastaste, Te quedó, Por cobrar (estimado), pedidos por estado, a dónde se fue el dinero y costo por venta. `periodo` es "actual" (corte actual), "anterior", "todo", el día de cierre de un corte (AAAA-MM-DD) o un rango "AAAA-MM-DD_AAAA-MM-DD".', input_schema: { type: 'object', properties: { periodo: { type: 'string', description: 'actual | anterior | todo | AAAA-MM-DD | AAAA-MM-DD_AAAA-MM-DD' } }, required: ['periodo'], additionalProperties: false } },
   { name: 'listar_cortes', description: 'Todos los cortes (periodos que cierran cada mes) con lo que entró, lo que se gastó, lo que quedó, pedidos pendientes y si están sellados.', input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false } },
   { name: 'listar_campanas', description: 'Las campañas con su resultado: pedidos por estado, ganancia real, tasa de devolución y devolución esperada. Incluye el id de cada campaña.', input_schema: { type: 'object', properties: {}, required: [], additionalProperties: false } },
@@ -29,7 +29,7 @@ export function crearHerramientas(uid, m = new Map()) {
       const b = await datosCortes(uid, m), s = b.salud
       return { fuente: 'obtener_salud_billetera', estado: s.estado, titulo: s.titulo, saldoBilletera: s.saldo, retiroRecomendado: s.retiroSeguro, limitadoPor: s.limitadoPor, libreSobreElPiso: s.libre, debeQuedar: s.bloqueado,
         piso: { pautaSieteDias: s.piso.pauta, ritmoDiarioConIva: s.piso.ritmo, deudaConMeta: s.piso.deudaMeta, saldoTarjeta: s.piso.tarjeta, devolucionesEsperadas: s.piso.devoluciones, diasDePautaQueCubre: s.piso.diasCubiertos },
-        imprevistosAhorroImpuestos: s.seQueda, utilidadAcumulada: s.utilidadAcumulada, lesTocaALasSocias: s.sociasAcumulado, yaRetirado: s.retirado, pendienteDeRetirar: s.sociasPorRetirar,
+        imprevistosAhorroImpuestos: s.seQueda, utilidadAcumulada: s.utilidadAcumulada, lesTocaALosSocios: s.sociasAcumulado, yaRetirado: s.retirado, pendienteDeRetirar: s.sociasPorRetirar,
         proyeccionEstimada: s.proyeccion ? { fecha: s.proyeccion.fecha, retiroPosible: s.proyeccion.retiro } : null, nota: 'Saldo, utilidad y retirado son reales; retiro recomendado y proyección son cálculo del sistema.' }
     },
     async obtener_periodo({ periodo }) {

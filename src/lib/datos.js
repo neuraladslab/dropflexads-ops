@@ -473,6 +473,8 @@ export async function datosCortes(uid, m = new Map()) {
   const sumar = (f) => Math.round(res.reduce((a, r) => a + f(r), 0) * 100) / 100
   const origen = { ingresos: sumar((r) => r.total.ganancia), publicidad: sumar((r) => r.total.meta), devoluciones: sumar((r) => r.total.devoluciones), comisiones: sumar((r) => r.total.comisiones),
     otros: sumar((r) => r.total.otrosDescuentos + r.total.otrosGastos), herramientas: sumar((r) => r.herramientas + r.total.pagosHerramientas), neto: acumulado }
+  origen.gastos = Math.round((origen.publicidad + origen.devoluciones + origen.comisiones + origen.otros + origen.herramientas) * 100) / 100 // todos los gastos reales juntos
+  origen.masGastos = Math.round((origen.herramientas + origen.comisiones + origen.otros) * 100) / 100 // herramientas, comisiones y otros
   cortes.reverse()
   return { generado: Date.now(), corte, inicio, hoy, cortes, salud, origen, ritmoPauta: pauta, retiradoTotal: Math.round(retirado * 100) / 100, utilidadRetenida: Math.max(0, Math.round((acumulado - retirado) * 100) / 100), saldoBilletera: b.saldo, saldoTarjeta: tar.tarjetaDropi ? tar.tarjetaDropi.saldo : null, herramientasPorDia: g.herramientasPorDia, reparto: { destinos: rep.destinos, propio: rep.propio }, pctDevolucion: pctEsperado, cierresListos: tablaCierres }
 }

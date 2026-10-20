@@ -19,6 +19,18 @@ export type EntradaSalud = {
 };
 export type Estado = "verde" | "amarillo" | "rojo" | "gris";
 export type LimitadoPor = "plan" | "necesidades" | "utilidad";
+/** Cifras derivadas que las pantallas muestran tal cual (así ninguna pantalla vuelve a calcular nada). */
+export type Derivadas = {
+  retirableDeLoQueLesToca: number; // lo que se puede retirar hoy de lo que les toca
+  pendiente: number; // lo que les toca y hoy no se puede retirar (no se pierde: se libera cuando sobra más)
+  pctRetirable: number; // retirable / lo que les toca, en % entero
+  pctSocios: number; // suma de los porcentajes de los socios en el reparto
+  porSocio: { nombre: string; pct: number; monto: number }[]; // el retiro de hoy partido según el reparto
+  seQuedaEnOperacion: number; // la parte de la utilidad que no es de los socios
+  saldoParaRetirarTodo: number; // saldo que tendría que tener la billetera para retirar todo lo que les toca
+  faltaParaRetirarTodo: number; // cuánto le falta hoy a la billetera para eso
+  bajoElMinimo: number; // cuánto por debajo del piso quedaría la billetera si se retirara todo lo que les toca
+};
 export type Salud = {
   estado: Estado; titulo: string; detalle: string;
   saldo: number | null; utilidadAcumulada: number; filas: FilaReparto[]; // la utilidad acumulada, dividida
@@ -27,6 +39,7 @@ export type Salud = {
   bloqueado: number; libre: number; utilidadRetenida: number;
   sociasAcumulado: number; retirado: number; sociasPorRetirar: number; retiroSeguro: number; limitadoPor: LimitadoPor | null;
   proyeccion: { fecha: string; dias: number; retiro: number } | null; // lo que se podría retirar cuando llegue lo que viene en camino (estimado)
+  derivadas: Derivadas;
 };
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const cop = (n: number) => (n < 0 ? "−" : "") + "$" + Math.abs(Math.round(n)).toLocaleString("es-CO");
@@ -44,10 +57,21 @@ function calcular(saldo: number, utilAcum: number, e: EntradaSalud) {
   return { util, filas, socias, seQueda, noPauta, porRetirar, pauta, tarjeta, dev, bloqueado, libre, retenida, retiro: r2(Math.max(0, monto)), lim };
 }
 
+const derivadasVacias: Derivadas = { retirableDeLoQueLesToca: 0, pendiente: 0, pctRetirable: 0, pctSocios: 0, porSocio: [], seQuedaEnOperacion: 0, saldoParaRetirarTodo: 0, faltaParaRetirarTodo: 0, bajoElMinimo: 0 };
+function derivar(saldo: number, c: ReturnType<typeof calcular>): Derivadas {
+  const socios = c.filas.filter((f) => f.tipo === "socio"), pctSocios = r2(socios.reduce((a, f) => a + f.pct, 0));
+  const retirable = Math.min(c.retiro, c.porRetirar), todo = r2(c.bloqueado + c.porRetirar);
+  return {
+    retirableDeLoQueLesToca: r2(retirable), pendiente: Math.max(0, r2(c.porRetirar - c.retiro)), pctRetirable: c.porRetirar > 0 ? Math.round((retirable / c.porRetirar) * 100) : 0, pctSocios,
+    porSocio: c.retiro > 0 && pctSocios > 0 ? socios.map((f) => ({ nombre: f.nombre, pct: f.pct, monto: Math.round((c.retiro * f.pct) / pctSocios) })) : [],
+    seQuedaEnOperacion: suma(c.filas, false), saldoParaRetirarTodo: todo, faltaParaRetirarTodo: Math.max(0, r2(todo - saldo)), bajoElMinimo: Math.max(0, r2(c.bloqueado - (saldo - c.porRetirar))),
+  };
+}
+
 export function evaluarSalud(e: EntradaSalud): Salud {
   const piso0 = { pauta: 0, deudaMeta: 0, ritmo: 0, tarjeta: 0, devoluciones: 0, total: 0, diasCubiertos: null };
   const vacio = { utilidadAcumulada: r2(Math.max(0, e.utilidadAcumulada)), filas: [] as FilaReparto[], piso: piso0, seQueda: 0, bloqueado: 0, libre: 0, utilidadRetenida: 0, sociasAcumulado: 0, retirado: r2(e.retirado),
-    sociasPorRetirar: 0, retiroSeguro: 0, limitadoPor: null as LimitadoPor | null, proyeccion: null };
+    sociasPorRetirar: 0, retiroSeguro: 0, limitadoPor: null as LimitadoPor | null, proyeccion: null, derivadas: derivadasVacias };
   if (e.saldoBilletera == null) return { estado: "gris", titulo: "Sin saldo de la billetera", detalle: "Sincroniza Dropi para conocer el saldo.", saldo: null, ...vacio };
   const c = calcular(e.saldoBilletera, e.utilidadAcumulada, e);
   let proyeccion: Salud["proyeccion"] = null;
@@ -59,7 +83,7 @@ export function evaluarSalud(e: EntradaSalud): Salud {
   const base = {
     saldo: r2(e.saldoBilletera), utilidadAcumulada: c.util, filas: c.filas,
     piso: { pauta: c.pauta, deudaMeta: r2(e.deudaMeta), ritmo: r2(e.ritmoPauta), tarjeta: r2(c.tarjeta), devoluciones: c.dev, total: r2(c.pauta + c.dev), diasCubiertos: e.ritmoPauta > 0 ? r2(Math.max(0, e.saldoBilletera + c.tarjeta - e.deudaMeta - c.dev - c.noPauta) / e.ritmoPauta) : null },
-    seQueda: c.seQueda, bloqueado: c.bloqueado, libre: c.libre, utilidadRetenida: c.retenida, sociasAcumulado: c.socias, retirado: r2(e.retirado), sociasPorRetirar: c.porRetirar, retiroSeguro: c.retiro, limitadoPor: c.lim, proyeccion,
+    seQueda: c.seQueda, bloqueado: c.bloqueado, libre: c.libre, utilidadRetenida: c.retenida, sociasAcumulado: c.socias, retirado: r2(e.retirado), sociasPorRetirar: c.porRetirar, retiroSeguro: c.retiro, limitadoPor: c.lim, proyeccion, derivadas: derivar(e.saldoBilletera, c),
   };
   if (e.cuadreMalo) return { estado: "rojo", titulo: "No retires todavía: las cifras no cuadran", detalle: "La billetera no cuadra con sus movimientos. Sincroniza Dropi de nuevo y revisa los avisos del corte antes de sacar plata.", ...base };
   if (!e.destinos.some((d) => d.tipo === "socio" && d.pct > 0)) return { estado: "gris", titulo: "No hay socios en el reparto", detalle: "Agrega al menos un destino de tipo «Socio/a» con porcentaje en Configuración → Reparto.", ...base };

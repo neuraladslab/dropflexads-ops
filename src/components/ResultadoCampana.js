@@ -12,7 +12,7 @@ export default function ResultadoCampana({ r, gasto }) {
     : <Dato l="Gasto en Meta" v="—" nota="sin campaña de Meta unida" />
   if (!r) return <div style={{ display: 'flex', gap: '12px 26px', flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}><span className="muted" style={{ fontSize: 14 }}>Todavía no hay pedidos de estos productos.</span>{dGasto}</div>
   return (
-    <div style={{ display: 'flex', gap: '12px 26px', flexWrap: 'wrap', marginTop: 14 }}>
+    <div className="rc-grid" style={{ display: 'flex', gap: '12px 26px', flexWrap: 'wrap', marginTop: 14 }}>
       <Dato l="Pedidos" v={fmtN(r.pedidos)} nota={r.enCurso ? `${fmtN(r.enCurso)} en curso` : null} />
       <Dato l="Entregados" v={fmtN(r.entregados)} nota={r.sinPagar ? `${fmtN(r.sinPagar)} sin pagar` : null} />
       <Dato l="Devueltos" v={fmtN(r.devueltos)} color={r.devueltos ? 'coral-ink' : undefined} nota={r.tasaDevolucion != null ? `${r.tasaDevolucion} % de los que terminaron` : null} />

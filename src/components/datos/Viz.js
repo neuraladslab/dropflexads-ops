@@ -8,9 +8,10 @@ const pct = (v, t) => { const p = t > 0 ? (v / t) * 100 : 0; return p > 0 && p <
 
 /**
  * Barra apilada: una sola barra dividida en tramos; la leyenda siempre dice cuánto vale cada uno (el color nunca va solo).
+ * `plegable` = id único: en el celular la leyenda se pliega tras un botón «Ver el detalle» (sin JavaScript); en escritorio se ve siempre.
  * `marca` = {valor, etiqueta}: línea punteada que indica «hasta aquí llega lo que hay» cuando los tramos suman más que eso (p. ej. se gastó más de lo que entró).
  */
-export function BarraApilada({ titulo, total, segmentos, marca, unidad = 'cop' }) {
+export function BarraApilada({ titulo, total, segmentos, marca, unidad = 'cop', plegable }) {
   const f = unidad === 'n' ? fmtN : cop
   const segs = segmentos.filter((s) => s.valor > 0)
   const suma = segs.reduce((a, s) => a + s.valor, 0)
@@ -18,6 +19,7 @@ export function BarraApilada({ titulo, total, segmentos, marca, unidad = 'cop' }
   const alt = segs.map((s) => `${s.etiqueta} ${f(s.valor)}`).join(', ')
   return (
     <div>
+      {plegable && <input type="checkbox" id={plegable} className="sal-chk" />}
       {(titulo || total != null) && <div className="vz-t"><span>{titulo}</span>{total != null && <b>{f(total)}</b>}</div>}
       <div className="vz-wrap">
         <div className="vz-bar" role="img" aria-label={`${titulo || 'Distribución'}: ${alt}`}>
@@ -26,13 +28,14 @@ export function BarraApilada({ titulo, total, segmentos, marca, unidad = 'cop' }
         {marca && marca.valor > 0 && marca.valor < suma && <div className="vz-marca" style={{ left: `${(marca.valor / suma) * 100}%` }}><span>{marca.etiqueta}</span></div>}
       </div>
       <ul className="vz-leg">{segs.map((s) => <li key={s.etiqueta}><i style={{ background: s.color }} />{s.etiqueta} <b>{f(s.valor)}</b> <span style={{ fontSize: 12.5 }}>· {pct(s.valor, suma)}</span></li>)}</ul>
+      {plegable && <label htmlFor={plegable} className="sal-leg-btn"><span className="a">Ver el detalle</span><span className="b">Ocultar el detalle</span></label>}
     </div>
   )
 }
 
 /** Tarjeta de una cifra: etiqueta (con su «?» de definición), valor y una nota corta. */
-export const Tile = ({ l, v, n, color, ayuda }) => (
-  <div className="vz-tile"><div className="l">{l}{ayuda && <Ayuda t={ayuda} />}</div><div className="v" style={color ? { color: `var(--${color})` } : undefined}>{v}</div>{n && <div className="n">{n}</div>}</div>
+export const Tile = ({ l, v, n, color, ayuda, cls }) => (
+  <div className={'vz-tile' + (cls ? ' ' + cls : '')}><div className="l">{l}{ayuda && <Ayuda t={ayuda} />}</div><div className="v" style={color ? { color: `var(--${color})` } : undefined}>{v}</div>{n && <div className="n">{n}</div>}</div>
 )
 
 /** «¿A dónde se fue lo que entró?»: publicidad, devoluciones, comisiones y otros, y lo que quedó. Si se gastó más de lo que entró, una línea punteada marca cuánto entró. */
