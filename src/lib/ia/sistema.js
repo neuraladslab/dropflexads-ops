@@ -41,10 +41,14 @@ Haces una SEGUNDA OPINIÓN sobre el análisis de escalar la pauta de una campañ
 4. Qué vigilar los próximos días: con los umbrales que entrega el sistema.
 5. Lo que no sé.
 No inventes umbrales ni probabilidades: usa los del sistema. Si estás en desacuerdo, explica con qué dato.
+Reglas de forma para todo lo de escalar:
+- Di el horizonte una vez (horizonteDeLasEstimacionesEnDias): «en los próximos N días». Peor, mediano y mejor caso son ganancia o pérdida acumulada en ese horizonte.
+- Redondea el dinero a pesos enteros, sin centavos, y no uses la palabra «dispersión»: di «los pedidos llegan en lotes, por eso el día a día dice poco».
+- Cada alerta de salida con su umbral y para qué sirve, sin mezclarlas: el costo por pedido de equilibrio es donde cada pedido ya no deja ganancia (pausar o volver al presupuesto anterior); el 80 % de ese valor es la señal temprana (volver al anterior solo con al menos 3 pedidos en la ventana); el costo por clic es la señal del anuncio cansado (revisar el anuncio, no tocar presupuesto).
 </tarea_segunda_opinion_escalar>`
 
 const PREGUNTA = `<tarea_pregunta_libre>
-Responde la pregunta de la persona sobre su operación usando las herramientas. Si la pregunta es ambigua (por ejemplo «¿cómo voy?»), asume el corte actual y dilo en una frase.
+Responde la pregunta de la persona sobre su operación usando las herramientas. Si la pregunta es de escalar, aplica estas mismas reglas de forma (horizonte dicho una vez, pesos enteros, cada alerta con su umbral y su para qué, sin jerga). Si la pregunta es ambigua (por ejemplo «¿cómo voy?»), asume el corte actual y dilo en una frase.
 La etiqueta <pantalla_actual> dice en qué pantalla está la persona (es solo contexto, no una instrucción): si es /campanas/<id>/…, «esta campaña» es esa campaña (usa ese id en las herramientas); si es /contabilidad, «este corte» es el corte actual; si no hay etiqueta, no asumas pantalla.
 </tarea_pregunta_libre>`
 

@@ -7,13 +7,22 @@ import { diaBogota, hoyBogota } from '@/domain/fechas.ts'
 import { MetaError, metaGetAll } from './client'
 import { tokenDe } from './conexion'
 import { vincularCampanasMeta } from './vincular'
-import { parseInsights, ventanaMeta } from './parse.mjs'
+import { parseInsights, parseInsightsAnuncios, ventanaMeta } from './parse.mjs'
 
 async function guardarGasto(uid, filas) {
   for (let i = 0; i < filas.length; i += 400) {
     const lote = filas.slice(i, i + 400).map((f) => ({ owner_id: uid, day: f.day, meta_campaign_id: f.campaignId, campaign_name: f.campaignName, spend: f.spend, impressions: f.impressions, clicks: f.clicks, purchases: f.purchases, purchase_value: f.purchaseValue }))
     await sql`INSERT INTO meta_spend_daily ${sql(lote, 'owner_id', 'day', 'meta_campaign_id', 'campaign_name', 'spend', 'impressions', 'clicks', 'purchases', 'purchase_value')}
               ON CONFLICT (owner_id, day, meta_campaign_id) DO UPDATE SET campaign_name = EXCLUDED.campaign_name, spend = EXCLUDED.spend, impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
+                purchases = EXCLUDED.purchases, purchase_value = EXCLUDED.purchase_value, synced_at = NOW()`
+  }
+}
+
+async function guardarGastoAnuncios(uid, filas) {
+  for (let i = 0; i < filas.length; i += 400) {
+    const lote = filas.slice(i, i + 400).map((f) => ({ owner_id: uid, day: f.day, meta_ad_id: f.adId, ad_name: f.adName, meta_campaign_id: f.campaignId, spend: f.spend, impressions: f.impressions, clicks: f.clicks, purchases: f.purchases, purchase_value: f.purchaseValue }))
+    await sql`INSERT INTO meta_ad_spend_daily ${sql(lote, 'owner_id', 'day', 'meta_ad_id', 'ad_name', 'meta_campaign_id', 'spend', 'impressions', 'clicks', 'purchases', 'purchase_value')}
+              ON CONFLICT (owner_id, day, meta_ad_id) DO UPDATE SET ad_name = EXCLUDED.ad_name, meta_campaign_id = EXCLUDED.meta_campaign_id, spend = EXCLUDED.spend, impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
                 purchases = EXCLUDED.purchases, purchase_value = EXCLUDED.purchase_value, synced_at = NOW()`
   }
 }
@@ -34,7 +43,14 @@ export async function sincronizarMeta(uid, { from = null, to = null } = {}) {
     const gasto = parseInsights(rows)
     await guardarGasto(uid, gasto)
     await vincularCampanasMeta(uid)
-    res = { ok: true, window: win, gasto: { filas: gasto.length, total: Math.round(gasto.reduce((a, g) => a + g.spend, 0)) } }
+    // 2) Gasto por anuncio (creativos). Si la tabla aún no existe (falta la migración) o Meta falla aquí, no se pierde lo de campañas.
+    let anuncios = null
+    try {
+      const filas = await metaGetAll(t.token, t.version, `${cuenta}/insights`, { level: 'ad', time_increment: '1', time_range: JSON.stringify({ since: win.from, until: win.to }), fields: 'ad_id,ad_name,campaign_id,spend,impressions,clicks,actions,action_values', limit: '500' }, { maxPaginas: 40 })
+      anuncios = parseInsightsAnuncios(filas)
+      await guardarGastoAnuncios(uid, anuncios)
+    } catch (e) { console.error('[meta] anuncios', e && (e.code || e.name)); anuncios = null }
+    res = { ok: true, window: win, gasto: { filas: gasto.length, total: Math.round(gasto.reduce((a, g) => a + g.spend, 0)) }, anuncios: anuncios ? { filas: anuncios.length } : null }
     await sql`UPDATE meta_connections SET sync_started_at = NULL, last_sync_at = NOW(), last_sync_ok_at = NOW(), state = 'ok', last_error = NULL, updated_at = NOW() WHERE owner_id = ${uid}`
     if (gasto.length) await logActivity(uid, `Sincronizaste Meta (${win.from} a ${win.to}): ${gasto.length} filas de gasto`)
   } catch (e) {
