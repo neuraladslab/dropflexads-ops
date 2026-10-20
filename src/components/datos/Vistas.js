@@ -1,4 +1,4 @@
-import { cop, fmtN, diaCorto, pct } from '@/lib/formato'
+import { cop, fmtN, diaCorto, pct, fechaLarga } from '@/lib/formato'
 import CobrosMeta from '@/components/CobrosMeta'
 import { hoyBogota } from '@/domain/fechas.ts'
 import Link from 'next/link'
@@ -182,7 +182,7 @@ export function VistaDashboard({ d }) {
 }
 
 /* ---------- Cuándo recupero ---------- */
-const fechaLarga = (f) => new Date(f + 'T12:00:00Z').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', timeZone: 'UTC' })
+const fechaCorta = (f) => fechaLarga(f, false)
 export function VistaCuandoRecupero({ d }) {
   const { rec, proy, pedidos } = d, c = pedidos.cuenta
   if (rec.estado === 'sin_datos' && !pedidos.lista.length) return <Aviso tono="blue" titulo="Aún no hay datos">Sincroniza Dropi en Mis cuentas: trae pedidos, billetera y tarjeta para calcular cuándo recuperas.</Aviso>
@@ -197,7 +197,7 @@ export function VistaCuandoRecupero({ d }) {
         <b style={{ fontSize: 21, color: `var(--${ya ? 'jade' : tono === 'blue' ? 'blue' : 'gold'}-ink)` }}>
           {ya ? `Ya recuperaste tu inversión y llevas ${cop(rec.excedente)} de ganancia.`
             : !proy ? `Te faltan ${cop(falta)} para recuperar tu inversión.`
-            : medio.cubre ? `Con lo que ya vendiste recuperas tu inversión hacia el ${fechaLarga(medio.fecha)}.`
+            : medio.cubre ? `Con lo que ya vendiste recuperas tu inversión hacia el ${fechaCorta(medio.fecha)}.`
             : `Con lo que ya vendiste todavía no alcanzas: te faltarían ${cop(-medio.sobra)}.`}
         </b>
         <div style={{ fontSize: 14.5, marginTop: 4 }}>
@@ -226,7 +226,7 @@ export function VistaCuandoRecupero({ d }) {
                 <span>Se entrega el <b>{Math.round(e.tasa * 100)} %</b> de los que van en camino</span>
                 <span style={{ display: 'inline-flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <span className="muted" style={{ fontSize: 13.5 }}>recibirías {cop(e.esperado)}</span>
-                  {e.cubre ? <Chip t="ok">Recuperas el {fechaLarga(e.fecha)}</Chip> : <Chip t="warn">Faltarían {cop(-e.sobra)}</Chip>}
+                  {e.cubre ? <Chip t="ok">Recuperas el {fechaCorta(e.fecha)}</Chip> : <Chip t="warn">Faltarían {cop(-e.sobra)}</Chip>}
                 </span>
               </div>
             ))}

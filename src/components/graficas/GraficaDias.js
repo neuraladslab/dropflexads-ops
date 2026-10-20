@@ -50,6 +50,7 @@ export default function GraficaDias({ dias: diasProp, vistas, tipo = 'barras', m
   const [rango, setRango] = useState(total > 14 ? 14 : 0)
   const [modoSel, setModoSel] = useState(null), [hover, setHover] = useState(null), [ancho, setAncho] = useState(720)
   const wrap = useRef(null), scroll = useRef(null)
+  const [izq, setIzq] = useState(0) // desplazamiento horizontal, para colocar el globo del punto
   const visibles = useMemo(() => (rango && rango < total ? dias.slice(-rango) : dias), [dias, rango, total])
   const modoAuto = visibles.length <= 45 ? 'dia' : visibles.length <= 200 ? 'semana' : 'mes'
   const modo = modoSel || modoAuto
@@ -98,7 +99,7 @@ export default function GraficaDias({ dias: diasProp, vistas, tipo = 'barras', m
   const etiqueta = (v) => (metrica.tipo === 'neto' ? barra(v) : formato === 'pct' ? pct(v) : formato === 'n' ? String(Math.round(v)) : corto(v))
   const base = y(Math.max(esc.a, Math.min(0, esc.b)))
   const tip = hover != null && pts[hover] ? pts[hover] : null
-  const tipX = tip ? Math.min(Math.max(EJE + x(hover) - (scroll.current ? scroll.current.scrollLeft : 0), 90), EJE + ancho - 90) : 0
+  const tipX = tip ? Math.min(Math.max(EJE + x(hover) - izq, 90), EJE + ancho - 90) : 0
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
@@ -126,7 +127,7 @@ export default function GraficaDias({ dias: diasProp, vistas, tipo = 'barras', m
         <svg width={EJE} height={H} aria-hidden="true" style={{ flex: 'none' }}>
           {esc.ticks.map((v) => <text key={v} x={EJE - 8} y={y(v) + 4} textAnchor="end" style={txt}>{ejeFmt[formato](v)}</text>)}
         </svg>
-        <div className="gr-scroll" ref={scroll} onScroll={() => setHover(null)}>
+        <div className="gr-scroll" ref={scroll} onScroll={(e) => { setHover(null); setIzq(e.currentTarget.scrollLeft) }}>
           <svg width={W} height={H} role="img" aria-label={`${titular}. ${pts.map((p) => `${nombreP(p, modo)}: ${p.v == null ? 'sin dato' : f(p.v)}`).join('; ')}`} style={{ display: 'block' }}>
             {esc.ticks.map((v) => <line key={v} x1={0} x2={W} y1={y(v)} y2={y(v)} stroke={v === 0 ? '#0F172A' : '#E2E8F0'} strokeWidth={v === 0 ? 1.4 : 1} strokeDasharray={v === 0 ? undefined : '3 4'} />)}
             {hover != null && <rect x={slot * hover} y={T - 8} width={slot} height={H - T - B + 8} fill="#EEF3FF" />}

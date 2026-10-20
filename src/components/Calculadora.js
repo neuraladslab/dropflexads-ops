@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { MODO_RAPIDO, entradaRapida, rentabilidad, escalado } from '@/domain/calculadora.ts'
+import { cop } from '@/lib/formato'
 
 // Misma interfaz de la calculadora original de DropFlexAds (pestañas, formulario + resultado en vivo, barra de distribución,
 // medidor de salud). Los números salen del dominio puro: src/domain/calculadora.ts.
-const cop = (n) => (n < 0 ? '−' : '') + '$' + Math.abs(Math.round(n)).toLocaleString('es-CO')
 const x1 = (n) => (Math.round(n * 100) / 100).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const kf = (n) => '$' + (n >= 1000 ? (Math.round(n / 100) / 10).toLocaleString('es-CO') + 'k' : Math.round(n).toLocaleString('es-CO'))
 const pctN = (v) => Math.round(v)

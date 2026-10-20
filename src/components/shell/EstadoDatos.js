@@ -8,13 +8,13 @@ export default function EstadoDatos() {
   const [e, setE] = useState(null)
   useEffect(() => {
     let vivo = true
-    fetch('/api/dropi').then((r) => (r.ok ? r.json() : null)).then((d) => { if (vivo) setE(d) }).catch(() => {})
+    fetch('/api/dropi').then((r) => (r.ok ? r.json() : null)).then((d) => { if (vivo) setE(d && { ...d, ms: d.lastSyncOkAt ? Date.now() - d.lastSyncOkAt : null }) }).catch(() => {})
     return () => { vivo = false }
   }, [])
   if (!e) return null
   let tono = 'warn', texto = 'Dropi sin conectar', ms = null
   if (e.connected) {
-    ms = e.lastSyncOkAt ? Date.now() - e.lastSyncOkAt : null
+    ms = e.ms
     const h = ms == null ? null : ms / 3600e3
     if (h != null && h < 12) { tono = 'ok'; texto = 'Datos al día' } else texto = h == null ? 'Sin sincronizar' : `Última sincronización hace ${h < 48 ? Math.round(h) + ' h' : Math.round(h / 24) + ' días'}`
   }
