@@ -5,6 +5,8 @@ export const corto = (n) => { const a = Math.abs(Math.round(Number(n) || 0)); co
 const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 /** 'YYYY-MM-DD' → '21 sep'. */
 export const diaCorto = (d) => { if (!d) return '—'; const [, m, dd] = String(d).slice(0, 10).split('-'); return `${Number(dd)} ${MES[Number(m) - 1]}` }
+/** 'YYYY-MM-DD' → '21 de septiembre de 2026' (o sin año). */
+export const fechaLarga = (d, conAnio = true) => new Date(d + 'T12:00:00Z').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', ...(conAnio ? { year: 'numeric' } : {}), timeZone: 'UTC' })
 /** Monto con signo para etiquetas de gráficas: +$55 mil, −$180 mil, +$900. */
 export const kshort = (n) => { const a = Math.abs(Math.round(Number(n) || 0)); return (n < 0 ? '−' : '+') + '$' + (a >= 1000 ? Math.round(a / 1000) + ' mil' : a) }
 /** Hace cuánto pasó algo (ms desde 1970): «hace 3 h». */

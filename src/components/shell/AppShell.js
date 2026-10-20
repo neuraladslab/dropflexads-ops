@@ -26,12 +26,14 @@ export default function AppShell({ email, children }) {
   const menuRef = useRef(null)
 
   // Preferencias de este navegador: menú minimizado y nivel de ayuda (Aprendiz / Avanzado).
+  /* eslint-disable react-hooks/set-state-in-effect -- se lee en el cliente tras hidratar para que el HTML del servidor coincida */
   useEffect(() => {
     setMin(ls.get('ops-side-min') === '1')
     const n = ls.get('ops-level') === 'pro' ? 'pro' : 'learner'
     setNivel(n)
     document.body.dataset.level = n
   }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
   const cambiarNivel = (n) => { setNivel(n); document.body.dataset.level = n; ls.set('ops-level', n) }
   const alternarMenu = () => setMin((v) => { ls.set('ops-side-min', v ? '0' : '1'); return !v })
 

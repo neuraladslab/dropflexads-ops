@@ -108,6 +108,7 @@ export default function ConexionMeta() {
   const [msg, setMsg] = useState({ texto: '', error: false })
 
   const cargar = useCallback(async () => { try { setD(await llamar('GET')); setErrorCarga('') } catch (e) { setErrorCarga(e.message) } }, [])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial desde la API
   useEffect(() => { cargar() }, [cargar])
 
   async function guardarIva(e) {

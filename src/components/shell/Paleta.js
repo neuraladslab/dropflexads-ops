@@ -13,6 +13,10 @@ const DESTINOS = ITEMS.flatMap((i) => (i.tabs
 const sinTildes = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 export default function Paleta({ abierta, onCerrar }) {
+  return abierta ? <PaletaAbierta onCerrar={onCerrar} /> : null // al abrir se monta de nuevo: búsqueda y selección parten de cero
+}
+
+function PaletaAbierta({ onCerrar }) {
   const router = useRouter()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
@@ -22,9 +26,9 @@ export default function Paleta({ abierta, onCerrar }) {
     return DESTINOS.filter((d) => !k || sinTildes(d.titulo + ' ' + d.seccion).includes(k))
   }, [q])
 
-  useEffect(() => { if (abierta) { setQ(''); setSel(0); setTimeout(() => input.current && input.current.focus(), 0) } }, [abierta])
-  useEffect(() => { setSel(0) }, [q])
-  if (!abierta) return null
+  useEffect(() => { input.current && input.current.focus() }, [])
+  const listaRef = useRef(null)
+  useEffect(() => { const el = listaRef.current && listaRef.current.querySelector('.pal-i.on'); if (el) el.scrollIntoView({ block: 'nearest' }) }, [sel])
 
   const ir = (d) => { onCerrar(); router.push(d.href) }
   const tecla = (e) => {
@@ -36,8 +40,8 @@ export default function Paleta({ abierta, onCerrar }) {
   return (
     <div className="pal-bg" onMouseDown={(e) => { if (e.target === e.currentTarget) onCerrar() }}>
       <div className="pal" role="dialog" aria-label="Buscar o ir a" onKeyDown={tecla}>
-        <input id="palq" ref={input} type="search" placeholder="Ir a… (Contabilidad, Pedidos, Caja, Calculadora)" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar o ir a" />
-        <div className="pal-list" role="listbox">
+        <input id="palq" ref={input} type="search" placeholder="Ir a… (Contabilidad, Pedidos, Caja, Calculadora)" value={q} onChange={(e) => { setQ(e.target.value); setSel(0) }} aria-label="Buscar o ir a" />
+        <div className="pal-list" role="listbox" ref={listaRef}>
           {lista.length === 0 && <p className="empty-note" style={{ padding: 14 }}>No encontré nada con ese texto.</p>}
           {lista.map((d, i) => (
             <button key={d.href} type="button" role="option" aria-selected={i === sel} className={'pal-i' + (i === sel ? ' on' : '')} onMouseEnter={() => setSel(i)} onClick={() => ir(d)}>

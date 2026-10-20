@@ -22,6 +22,7 @@ export default function PanelMeta() {
   const [trabajando, setTrabajando] = useState(false)
   const [res, setRes] = useState(null)
   const cargar = useCallback(async () => { try { setD(await llamar('GET')); setError('') } catch (e) { setError(e.message) } }, [])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial desde la API
   useEffect(() => { cargar() }, [cargar])
 
   async function sincronizar() {

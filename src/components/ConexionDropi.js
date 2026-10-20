@@ -4,18 +4,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Icono } from '@/components/shell/Icono'
 import Dialogo from '@/components/Dialogo'
-import { diaCorto } from '@/lib/formato'
+import { diaCorto, hace, cop } from '@/lib/formato'
 
 // Mismo diseño que el panel de Dropi de la app original: tarjeta horizontal a todo el ancho (estado a la izquierda, botones a la derecha),
 // versión compacta minimizable y diálogos para conectar y desconectar.
-const hace = (ms) => {
-  if (!ms) return 'nunca'
-  const m = Math.round((Date.now() - ms) / 60000)
-  return m < 1 ? 'hace un momento' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`
-}
 const espera = (s) => (s >= 3600 ? Math.ceil(s / 3600) + ' h' : Math.max(1, Math.ceil(s / 60)) + ' min')
 const hoyISO = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10)
-const cop = (n) => '$' + Math.round(n).toLocaleString('es-CO')
 
 async function llamar(method, body) {
   const res = await fetch('/api/dropi', { method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
@@ -138,6 +132,7 @@ export default function ConexionDropi() {
   const cargar = useCallback(async () => {
     try { setD(await llamar('GET')); setErrorCarga('') } catch (e) { setErrorCarga(e.message) }
   }, [])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial desde la API
   useEffect(() => { cargar() }, [cargar])
 
   // «Sincronizar desde»: trae tarjeta, billetera y pedidos desde esa fecha. Una fecha anterior al inicio amplía la operación; una posterior solo limita lo que se lee. Nunca borra días anteriores ni duplica lo que ya está.

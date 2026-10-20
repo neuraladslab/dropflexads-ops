@@ -1,4 +1,4 @@
-import { cop, fmtN, diaCorto } from '@/lib/formato'
+import { cop, fmtN, diaCorto, fechaLarga } from '@/lib/formato'
 import AccionesCorte from './AccionesCorte'
 import HojaInforme from './HojaInforme'
 import { BarraApilada, COLOR, desgloseCorte } from './Viz'
@@ -6,7 +6,6 @@ import { TIPOS } from '@/domain/reparto.ts'
 
 // Informe de cierre de un corte, con el diseño del «informe para reclamos ante Dropi»: una hoja de documento (título, tabla de identificación, resumen con puntos a revisar,
 // secciones numeradas con tablas simples) y una barra de controles. Todo el texto que viene de fuera pasa por React, que lo escapa.
-const fechaLarga = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
 const fechaHora = (ms) => new Date(ms).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'long', timeStyle: 'short' })
 const signo = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + cop(Math.abs(n))
 const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) + ' %' : '—')
