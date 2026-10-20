@@ -158,7 +158,7 @@ export function InformeCorte({ c, anterior, d }) {
       <HojaInforme
         titulo="Informe de cierre del corte" subtitulo="DropFlexAds · contabilidad de la operación"
         titularInicial={socias.map((x) => x.nombre).join(' y ')}
-        filasId={[['Período del corte', `${fechaLarga(c.desde)} al ${fechaLarga(c.hasta)}`], ['Estado', c.abierto ? 'Abierto' : sellado ? `Cerrado y sellado (versión ${sellado.versiones})` : 'Cerrado, sin sellar'], ['Día de cierre', `Cada ${d.corte} del mes`], ['Informe generado', fechaHora(d.generado)]]}
+        filasId={[['Período del corte', `${fechaLarga(c.desde)} al ${fechaLarga(c.hasta)}`], ['Estado', c.abierto ? 'Abierto' : sellado ? `Cerrado y sellado (versión ${sellado.versiones})` : 'Cerrado, sin sellar'], ['Día de cierre', d.corte === 31 ? 'Último día de cada mes' : `Cada ${d.corte} del mes`], ['Informe generado', fechaHora(d.generado)]]}
         intro={intro} puntos={puntos} secciones={secciones} texto={texto}
         pie="Informe generado con DropFlexAds a partir de los movimientos de la billetera y la tarjeta sincronizados con Dropi, el gasto y los cobros de Meta y los pedidos de Dropi. Las cifras marcadas como estimado usan promedios propios y el % de devolución esperado de cada campaña; nunca se suman a lo que ya entró a la billetera."
         acciones={<AccionesCorte id={c.id} abierto={c.abierto} sellado={!!sellado} puedeSellar={d.cierresListos} />} />

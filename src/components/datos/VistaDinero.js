@@ -101,7 +101,7 @@ export function VistaDinero({ d }) {
       )}
 
       <Seccion titulo="Cómo han ido los cortes"><CortesLista cortes={base.cortes} /></Seccion>
-      <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>Cortas el día {base.corte} de cada mes · <Link href="/configuracion/corte" className="link">cambiar</Link> · la operación empezó el {diaCorto(base.inicio)} · nada se borra ni se oculta.</p>
+      <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>Cortas {base.corte === 31 ? 'el último día de cada mes' : `el día ${base.corte} de cada mes`} · <Link href="/configuracion/corte" className="link">cambiar</Link> · la operación empezó el {diaCorto(base.inicio)} · nada se borra ni se oculta.</p>
 
       <details className="vz-det card" style={{ marginTop: 18 }}>
         <summary>Qué significa cada cifra</summary>
