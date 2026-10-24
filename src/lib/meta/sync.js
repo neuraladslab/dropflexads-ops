@@ -20,9 +20,9 @@ async function guardarGasto(uid, filas) {
 
 async function guardarGastoAnuncios(uid, filas) {
   for (let i = 0; i < filas.length; i += 400) {
-    const lote = filas.slice(i, i + 400).map((f) => ({ owner_id: uid, day: f.day, meta_ad_id: f.adId, ad_name: f.adName, meta_campaign_id: f.campaignId, spend: f.spend, impressions: f.impressions, clicks: f.clicks, purchases: f.purchases, purchase_value: f.purchaseValue }))
-    await sql`INSERT INTO meta_ad_spend_daily ${sql(lote, 'owner_id', 'day', 'meta_ad_id', 'ad_name', 'meta_campaign_id', 'spend', 'impressions', 'clicks', 'purchases', 'purchase_value')}
-              ON CONFLICT (owner_id, day, meta_ad_id) DO UPDATE SET ad_name = EXCLUDED.ad_name, meta_campaign_id = EXCLUDED.meta_campaign_id, spend = EXCLUDED.spend, impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
+    const lote = filas.slice(i, i + 400).map((f) => ({ owner_id: uid, day: f.day, meta_ad_id: f.adId, ad_name: f.adName, adset_id: f.adsetId, adset_name: f.adsetName, meta_campaign_id: f.campaignId, spend: f.spend, impressions: f.impressions, clicks: f.clicks, purchases: f.purchases, purchase_value: f.purchaseValue }))
+    await sql`INSERT INTO meta_ad_spend_daily ${sql(lote, 'owner_id', 'day', 'meta_ad_id', 'ad_name', 'adset_id', 'adset_name', 'meta_campaign_id', 'spend', 'impressions', 'clicks', 'purchases', 'purchase_value')}
+              ON CONFLICT (owner_id, day, meta_ad_id) DO UPDATE SET ad_name = EXCLUDED.ad_name, adset_id = EXCLUDED.adset_id, adset_name = EXCLUDED.adset_name, meta_campaign_id = EXCLUDED.meta_campaign_id, spend = EXCLUDED.spend, impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
                 purchases = EXCLUDED.purchases, purchase_value = EXCLUDED.purchase_value, synced_at = NOW()`
   }
 }
@@ -46,7 +46,7 @@ export async function sincronizarMeta(uid, { from = null, to = null } = {}) {
     // 2) Gasto por anuncio (creativos). Si la tabla aún no existe (falta la migración) o Meta falla aquí, no se pierde lo de campañas.
     let anuncios = null
     try {
-      const filas = await metaGetAll(t.token, t.version, `${cuenta}/insights`, { level: 'ad', time_increment: '1', time_range: JSON.stringify({ since: win.from, until: win.to }), fields: 'ad_id,ad_name,campaign_id,spend,impressions,clicks,actions,action_values', limit: '500' }, { maxPaginas: 40 })
+      const filas = await metaGetAll(t.token, t.version, `${cuenta}/insights`, { level: 'ad', time_increment: '1', time_range: JSON.stringify({ since: win.from, until: win.to }), fields: 'ad_id,ad_name,adset_id,adset_name,campaign_id,spend,impressions,clicks,actions,action_values', limit: '500' }, { maxPaginas: 40 })
       anuncios = parseInsightsAnuncios(filas)
       await guardarGastoAnuncios(uid, anuncios)
     } catch (e) { console.error('[meta] anuncios', e && (e.code || e.name)); anuncios = null }
