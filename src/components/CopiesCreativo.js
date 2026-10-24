@@ -57,7 +57,7 @@ export default function CopiesCreativo({ creativo, autoGenerar = false, onCerrar
   }, [creativo.id, autoGenerar, generar])
   const hay = copies && copies.length > 0
   return (
-    <Dialogo etiqueta="Copies de Meta Ads" onCerrar={onCerrar}>
+    <Dialogo etiqueta="Copies de Meta Ads" onCerrar={onCerrar} ancho={900}>
       <h2 style={{ margin: '0 0 4px' }}>Copies para Meta Ads</h2>
       <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13, wordBreak: 'break-all' }}>{creativo.nombre}</div>
       <div className="muted" style={{ fontSize: 13.5, margin: '2px 0 14px' }}>{creativo.angulo} · {creativo.formato === 'video' ? 'Video' : 'Imagen'}. Escritos con las fórmulas AIDA y PAS y revisados contra las normas de Meta; aun así, léelos antes de publicar.</div>
@@ -71,11 +71,11 @@ export default function CopiesCreativo({ creativo, autoGenerar = false, onCerrar
         {hay && !generando && <div className="cp-lista">{copies.map((c) => <Tarjeta key={c.n} c={c} />)}</div>}
         {copies && !hay && !generando && !error && <p className="muted">Este creativo aún no tiene copies.</p>}
       </div>
-      <div className="fbar" style={{ marginTop: 16 }}>
+      <div className="fbar cp-pie">
+        {hay && <span className="muted cp-nota">«Generar otros 5» reemplaza los actuales y cuenta en tu tope mensual de IA.</span>}
         <button className="btn ghost" type="button" onClick={onCerrar}>Cerrar</button>
         <button className="btn" type="button" onClick={generar} disabled={generando || copies === null}>{hay ? 'Generar otros 5' : 'Generar 5 copies'}</button>
       </div>
-      {hay && <p className="muted" style={{ fontSize: 12.5, margin: '8px 0 0' }}>«Generar otros 5» reemplaza los actuales. Cada tanda cuesta unos centavos de dólar y cuenta en tu tope mensual de IA.</p>}
     </Dialogo>
   )
 }
