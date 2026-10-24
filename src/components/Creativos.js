@@ -101,26 +101,6 @@ function Editar({ c, sinEnlazar, onCerrar }) {
   )
 }
 
-function Resumen({ titulo, filas, nombre }) {
-  if (!filas.length) return null
-  return (
-    <div className="cr-res"><div className="cr-res-t">{titulo}</div>
-      <div className="scroll-x"><table className="tbl tbl-res"><thead><tr><th>{nombre}</th><th>Creativos</th><th>Funcionan</th><th>A refrescar</th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Costo por compra</th></tr></thead>
-        <tbody>{filas.map((f) => <tr key={f.clave}><td><b>{f.clave === 'video' || f.clave === 'imagen' ? FORMATOS[f.clave].nombre : f.clave}</b></td><td>{fmtN(f.creativos)}</td><td>{fmtN(f.funcionan)}</td><td>{fmtN(f.refrescar)}</td><td>{cop(f.gasto)}</td><td>{pct1(f.ctr)}</td><td>{f.cpc == null ? '—' : cop(f.cpc)}</td><td>{f.costoCompra == null ? '—' : cop(f.costoCompra)}</td></tr>)}</tbody></table></div></div>
-  )
-}
-
-/** Qué ángulo / qué formato rinde mejor dentro de UNA campaña (suma del gasto y los clics de sus creativos). */
-function resumirPor(items, clave) {
-  const m = new Map()
-  for (const c of items) {
-    const k = clave(c), l = c.lectura, x = m.get(k) || { clave: k, creativos: 0, funcionan: 0, refrescar: 0, gasto: 0, clics: 0, impresiones: 0, compras: 0 }
-    x.creativos++; if (l.etiqueta === 'funciona') x.funcionan++; if (l.etiqueta === 'refrescar') x.refrescar++
-    x.gasto += l.gasto; x.clics += l.clics; x.impresiones += l.impresiones; x.compras += l.compras; m.set(k, x)
-  }
-  return [...m.values()].map((x) => ({ ...x, ctr: x.impresiones ? x.clics / x.impresiones : null, cpc: x.clics ? x.gasto / x.clics : null, costoCompra: x.compras ? x.gasto / x.compras : null })).sort((a, b) => b.gasto - a.gasto)
-}
-
 /** Semáforo de lo que está circulando: qué funciona, qué rinde regular y qué conviene apagar o refrescar. Cada creativo abre su campaña. */
 function Semaforo({ creativos, onAbrir }) {
   const circ = creativos.filter((c) => c.estado === 'circulando')
@@ -141,22 +121,6 @@ function Semaforo({ creativos, onAbrir }) {
         </div>
       ))}
     </div>
-  )
-}
-
-/** Ángulo y formato en un solo plegable, y solo cuando comparan algo nuevo: hay gasto y algún ángulo o formato junta 2+ creativos.
- *  Con un creativo por grupo sería la misma fila de la tabla de arriba (mismo gasto, CTR y costos). */
-function Comparativa({ items }) {
-  if (!items.some((c) => c.lectura.gasto > 0)) return null
-  const ang = resumirPor(items, (c) => c.angulo.toUpperCase()), fmt = resumirPor(items, (c) => c.formato)
-  const compara = (f) => f.length > 1 && f.some((x) => x.creativos > 1)
-  const util = [compara(ang) && { titulo: '¿Qué ángulo rinde mejor?', nombre: 'Ángulo', filas: ang }, compara(fmt) && { titulo: '¿Video o imagen?', nombre: 'Formato', filas: fmt }].filter(Boolean)
-  if (!util.length) return null
-  return (
-    <details className="cr-resumenes" open>
-      <summary>Comparar por ángulo y formato</summary>
-      {util.map((u) => <Resumen key={u.nombre} titulo={u.titulo} nombre={u.nombre} filas={u.filas} />)}
-    </details>
   )
 }
 
@@ -317,7 +281,6 @@ export default function Creativos({ d, campanaFija = null }) {
                           </div>
                         )
                       })}
-                      <Comparativa items={g.items} />
                     </div>
                   )}
                 </section>
