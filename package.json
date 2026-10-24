@@ -11,6 +11,7 @@
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "auth:init": "node scripts/auth-init.mjs",
     "auth:secret": "node scripts/auth-init.mjs --print",
+    "demo:creativos": "node --env-file=.env.local scripts/demo-creativos.mjs",
     "user:create": "node --env-file=.env.local scripts/user-create.mjs",
     "user:passwd": "node --env-file=.env.local scripts/user-passwd.mjs",
     "user:disable": "node --env-file=.env.local scripts/user-disable.mjs",
