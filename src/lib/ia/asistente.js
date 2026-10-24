@@ -49,7 +49,7 @@ export async function guardarConfig(uid, v) {
   return { ok: true, valor: r.valor }
 }
 
-const clienteDe = async (uid) => {
+export const clienteDe = async (uid) => {
   const blob = await getSetting(uid, 'ia_key'), clave = blob ? decryptSecret(blob, aad(uid)) : null, ws = await getSetting(uid, 'ia_ws')
   // Las claves que no pertenecen a un espacio de trabajo (workspace) exigen indicar cuál usar.
   return clave ? new Anthropic({ apiKey: clave, maxRetries: 2, timeout: 120_000, ...(ws ? { defaultHeaders: { 'anthropic-workspace-id': ws } } : {}) }) : null

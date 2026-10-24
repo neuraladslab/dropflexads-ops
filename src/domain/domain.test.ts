@@ -765,3 +765,39 @@ test("salud: las cifras derivadas salen del dominio y cuadran con el resto (las 
   // sin saldo no se inventa nada
   const sin = salud({ saldoBilletera: null as never }).derivadas; assert.equal(sin.porSocio.length, 0); assert.equal(sin.pctRetirable, 0);
 });
+
+import { revisarCopy, leerCopies, contarEmojis } from "./copies.ts";
+
+const ctxCopy = { campana: "CLAGEN | Colageno | v1", productos: ["Colágeno hidrolizado 12 vitaminas"], angulo: "Movilidad y articulaciones", formato: "video", gancho: null };
+const buenCopy = { formula: "AIDA" as const, principal: "✨ Tu día pide más soltura.\nDescubre el colágeno con 12 vitaminas pensado para acompañar tu rutina 💪\nEscríbenos y pídelo hoy.", titulo: "Colágeno con 12 vitaminas", descripcion: "Pídelo hoy 🚚" };
+
+test("copies: un copy limpio no tiene avisos", () => {
+  assert.deepEqual(revisarCopy(buenCopy, ctxCopy), []);
+});
+
+test("copies: detecta lo que Meta rechaza (atributos personales, claims médicos, promesas, antes/después, cifras y pruebas inventadas, urgencia falsa)", () => {
+  const con = (principal: string, titulo = "Colágeno diario", descripcion = "Pídelo hoy 🚚") => revisarCopy({ ...buenCopy, principal, titulo, descripcion }, ctxCopy);
+  assert.ok(con("¿Sufres de dolor en las articulaciones? 💪 Prueba esto").some((a) => /atributo personal/.test(a)));
+  assert.ok(con("Tus dolores se acaban con esto 💪").some((a) => /atributo personal/.test(a)));
+  assert.ok(con("Ayuda a prevenir la artritis 💪").some((a) => /médico/.test(a)));
+  assert.ok(con("Resultados garantizados en tus articulaciones 💪").some((a) => /garantizados|milagrosos/.test(a)));
+  assert.ok(con("Mira el antes y después 💪").some((a) => /antes y después/.test(a)));
+  assert.ok(con("Más de 5000 clientes satisfechos ya lo usan 💪").some((a) => /pruebas|testimonios/.test(a)));
+  assert.ok(con("Rejuvenece 10 años con colágeno 💪").some((a) => /cifras/.test(a)));
+  assert.ok(con("Últimas unidades, solo hoy 💪").some((a) => /Urgencia/.test(a)));
+  assert.ok(con("Hecho para Instagram 💪").some((a) => /marcas de Meta/.test(a)));
+  assert.ok(con("Colágeno con 12 vitaminas 💪", "COLÁGENO PREMIUM AHORA").some((a) => /MAYÚSCULAS/.test(a)));
+  assert.ok(con("Colágeno con 12 vitaminas!! 💪").some((a) => /exclamación/.test(a)));
+  assert.ok(con("Colágeno con 12 vitaminas").some((a) => /ningún emoji/.test(a)));
+  assert.ok(con("Colágeno con 12 vitaminas 💪", "Un título larguísimo que pasa de los cuarenta caracteres").some((a) => /título pasa/.test(a)));
+  assert.equal(contarEmojis("a ✨ b 💪 c"), 2);
+});
+
+test("copies: lee el JSON del modelo y exige 5 copies completos con fórmula AIDA o PAS", () => {
+  const c = (i: number, f = "AIDA") => ({ formula: f, texto_principal: `Texto ${i} ✨`, titulo: `Título ${i}`, descripcion: `Desc ${i}` });
+  const ok = leerCopies("Aquí va:\n" + JSON.stringify({ copies: [c(1), c(2), c(3, "pas"), c(4, "PAS"), c(5)] }));
+  assert.equal(ok.ok, true); if (ok.ok) { assert.equal(ok.copies.length, 5); assert.equal(ok.copies[2].formula, "PAS"); }
+  assert.equal(leerCopies("sin json").ok, false);
+  assert.equal(leerCopies(JSON.stringify({ copies: [c(1), c(2)] })).ok, false); // faltan copies
+  assert.equal(leerCopies(JSON.stringify({ copies: [c(1), c(2), c(3), c(4), c(5, "AIDAX")] })).ok, false); // una fórmula inválida se descarta → quedan 4
+});

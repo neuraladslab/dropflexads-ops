@@ -354,3 +354,19 @@ CREATE TABLE IF NOT EXISTS dropi_products (
 -- Conjunto de anuncios de cada anuncio (una campaña tiene varios conjuntos y cada conjunto varios anuncios): organiza los creativos por campaña y conjunto.
 ALTER TABLE meta_ad_spend_daily ADD COLUMN IF NOT EXISTS adset_id VARCHAR(40);
 ALTER TABLE meta_ad_spend_daily ADD COLUMN IF NOT EXISTS adset_name VARCHAR(250);
+
+-- Copies de Meta Ads (texto principal, título y descripción) que la IA escribe para cada creativo: 5 por creativo, con la fórmula (AIDA o PAS) y los avisos de la revisión de normas.
+CREATE TABLE IF NOT EXISTS creative_copies (
+  creative_id INTEGER NOT NULL REFERENCES creatives(id) ON DELETE CASCADE,
+  position SMALLINT NOT NULL CHECK (position BETWEEN 1 AND 5),
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  formula VARCHAR(8) NOT NULL CHECK (formula IN ('AIDA', 'PAS')),
+  primary_text TEXT NOT NULL,
+  headline VARCHAR(160) NOT NULL,
+  description VARCHAR(160) NOT NULL,
+  warnings TEXT[] NOT NULL DEFAULT '{}',
+  model VARCHAR(40),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (creative_id, position)
+);
+CREATE INDEX IF NOT EXISTS idx_creative_copies_owner ON creative_copies (owner_id, creative_id);
