@@ -1005,3 +1005,6 @@ details.vz-det[open]>summary::before{content:"▾ "}
 .cr-resumenes{display:grid;gap:12px;padding:14px 16px;border-top:1px solid var(--line)}
 .cr-res-t{font-weight:700;padding-bottom:6px}
 @media (max-width:900px){.cr-sem{grid-template-columns:1fr}}
+
+.cr-resumenes>summary{cursor:pointer;font-weight:700;min-height:32px;display:flex;align-items:center}
+.cr-resumenes[open]>summary{margin-bottom:6px}
