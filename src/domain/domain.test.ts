@@ -260,24 +260,24 @@ test("lo anterior al inicio de la operación no cuenta (un pedido del 9 de agost
 
 import { combosVendidos } from "./combos.ts";
 
-test("combos: ventas, precio, facturado y ganancia real por unidades del pedido", () => {
+test("combos: ventas, facturado y ganancia real agrupados por el valor total del pedido", () => {
   const p = [
     { idPedido: "1", unidades: 1, total: 89900, contable: "pagado", creado: "2026-10-01" },
     { idPedido: "2", unidades: 1, total: 89900, contable: "pagado", creado: "2026-10-02" },
-    { idPedido: "3", unidades: 1, total: 79900, contable: "sin_pagar", creado: "2026-10-03" }, // entregado pero aún sin ganancia en la billetera
+    { idPedido: "3", unidades: 1, total: 79900, contable: "sin_pagar", creado: "2026-10-03" }, // otro valor = otro combo; entregado pero aún sin ganancia en la billetera
     { idPedido: "4", unidades: 2, total: 129900, contable: "pagado", creado: "2026-10-02" },
     { idPedido: "5", unidades: 2, total: 129900, contable: "devuelto", creado: "2026-10-02" }, // devuelto: no es venta
-    { idPedido: "6", unidades: null, total: 50000, contable: "pagado" }, // sin cantidad: no se puede ubicar
+    { idPedido: "6", unidades: null, total: 89900, contable: "pagado" }, // sin cantidad: igual se clasifica por su valor
     { idPedido: "7", unidades: 3, total: 169900, contable: "en_curso" }, // en camino: no es venta todavía
+    { idPedido: "8", unidades: 1, total: null, contable: "pagado" }, // sin valor: no se puede ubicar
   ];
   const r = combosVendidos(p, new Map([["1", 49900], ["2", 49900], ["4", 64900], ["6", 1000]]));
-  assert.deepEqual(r.filas.map((f) => [f.unidades, f.ventas, f.pctVentas]), [[1, 3, 75], [2, 1, 25]]);
-  assert.equal(r.filas[0].precio, 89900); // el precio más frecuente (2 de 3)
-  assert.equal(r.filas[0].facturado, 259700);
-  assert.equal(r.filas[0].gananciaTotal, 99800); assert.equal(r.filas[0].conGanancia, 2); assert.equal(r.filas[0].gananciaPorVenta, 49900); // el sin pagar no promedia
-  assert.equal(r.filas[1].gananciaPorVenta, 64900);
-  assert.deepEqual(r.total, { ventas: 4, facturado: 389600, gananciaTotal: 164700, conGanancia: 3, gananciaPorVenta: 54900 });
-  assert.equal(r.sinCantidad, 1);
+  assert.deepEqual(r.filas.map((f) => [f.valor, f.unidades, f.ventas, f.pctVentas]), [[79900, 1, 1, 20], [89900, 1, 3, 60], [129900, 2, 1, 20]]);
+  assert.equal(r.filas[1].facturado, 269700);
+  assert.equal(r.filas[1].gananciaTotal, 100800); assert.equal(r.filas[1].conGanancia, 3); assert.equal(r.filas[1].gananciaPorVenta, 33600);
+  assert.equal(r.filas[0].gananciaPorVenta, null); // el sin pagar no promedia
+  assert.deepEqual(r.total, { ventas: 5, facturado: 479500, gananciaTotal: 165700, conGanancia: 4, gananciaPorVenta: 41425 });
+  assert.equal(r.sinValor, 1);
   assert.deepEqual(combosVendidos([], new Map()).filas, []);
 });
 

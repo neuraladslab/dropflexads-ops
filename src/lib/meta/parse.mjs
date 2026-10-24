@@ -32,7 +32,7 @@ export function parseInsightsAnuncios(rows) {
     if (!id || !day) continue
     const compra = (arr) => (Array.isArray(arr) ? arr.find((a) => a.action_type === 'omni_purchase') || arr.find((a) => a.action_type === 'purchase') : null)
     out.push({
-      day, adId: id, adName: String(r.ad_name || '').slice(0, 250), campaignId: String(r.campaign_id || '').replace(/\D/g, '').slice(0, 40) || null, spend: r2(num(r.spend)),
+      day, adId: id, adName: String(r.ad_name || '').slice(0, 250), adsetId: String(r.adset_id || '').replace(/\D/g, '').slice(0, 40) || null, adsetName: String(r.adset_name || '').slice(0, 250) || null, campaignId: String(r.campaign_id || '').replace(/\D/g, '').slice(0, 40) || null, spend: r2(num(r.spend)),
       impressions: Math.round(num(r.impressions)), clicks: Math.round(num(r.clicks)),
       purchases: Math.round(num((compra(r.actions) || {}).value)), purchaseValue: r2(num((compra(r.action_values) || {}).value)),
     })

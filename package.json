@@ -27,7 +27,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
     "jose": "^6.2.12",
-    "next": "16.4.0",
+    "next": "16.4.3",
     "postgres": "^3.4.0",
     "qrcode-generator": "^2.0.4",
     "react": "19.3.0",
@@ -39,7 +39,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.4.3",
     "playwright": "^1.64.0",
     "typescript": "^5"
   },

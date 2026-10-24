@@ -350,3 +350,7 @@ CREATE TABLE IF NOT EXISTS dropi_products (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (owner_id, product_id)
 );
+
+-- Conjunto de anuncios de cada anuncio (una campaña tiene varios conjuntos y cada conjunto varios anuncios): organiza los creativos por campaña y conjunto.
+ALTER TABLE meta_ad_spend_daily ADD COLUMN IF NOT EXISTS adset_id VARCHAR(40);
+ALTER TABLE meta_ad_spend_daily ADD COLUMN IF NOT EXISTS adset_name VARCHAR(250);

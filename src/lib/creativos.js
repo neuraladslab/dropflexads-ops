@@ -15,7 +15,7 @@ export async function datosCreativos(uid, { campanaId = null } = {}) {
   try {
     ;[cr, dias] = await Promise.all([
       sql`SELECT id, campaign_id, campaign_label, angle, format, version, made_on::text AS made_on, name, status, status_changed_at, drive_url, hook, notes, meta_ad_id, created_at FROM creatives WHERE owner_id = ${uid} ORDER BY created_at DESC, id DESC`,
-      sql`SELECT day::text AS day, meta_ad_id, ad_name, meta_campaign_id, spend, impressions, clicks, purchases FROM meta_ad_spend_daily WHERE owner_id = ${uid} AND day >= (CURRENT_DATE - 365)`,
+      sql`SELECT day::text AS day, meta_ad_id, ad_name, adset_id, adset_name, meta_campaign_id, spend, impressions, clicks, purchases FROM meta_ad_spend_daily WHERE owner_id = ${uid} AND day >= (CURRENT_DATE - 365)`,
     ])
   } catch (e) {
     if (e && e.code === SIN_TABLA) return { sinMigracion: true }
@@ -27,8 +27,9 @@ export async function datosCreativos(uid, { campanaId = null } = {}) {
   // Gasto por anuncio, agrupado por id de anuncio y por nombre (el nombre es la llave principal; el id sirve para enlaces manuales).
   const porAd = new Map()
   for (const d of dias) {
-    const a = porAd.get(d.meta_ad_id) || { id: d.meta_ad_id, nombre: d.ad_name || '', metaCamp: d.meta_campaign_id, ultimoDia: d.day, gasto: 0, dias: [] }
+    const a = porAd.get(d.meta_ad_id) || { id: d.meta_ad_id, nombre: d.ad_name || '', metaCamp: d.meta_campaign_id, ultimoDia: d.day, gasto: 0, dias: [], conjunto: null }
     if (d.day >= a.ultimoDia) { a.ultimoDia = d.day; a.nombre = d.ad_name || a.nombre }
+    if (d.adset_id && (!a.conjunto || d.day >= a.conjunto.dia)) a.conjunto = { id: d.adset_id, nombre: d.adset_name || 'Conjunto ' + d.adset_id, dia: d.day }
     a.gasto += num(d.spend)
     a.dias.push({ dia: d.day, gasto: num(d.spend), impresiones: num(d.impressions), clics: num(d.clicks), compras: num(d.purchases) })
     porAd.set(d.meta_ad_id, a)
@@ -39,7 +40,9 @@ export async function datosCreativos(uid, { campanaId = null } = {}) {
     const ids = new Set([...(idsPorNombre.get(llaveNombre(c.name)) || []), ...(c.meta_ad_id ? [c.meta_ad_id] : [])])
     const porDia = new Map()
     for (const id of ids) for (const d of (porAd.get(id)?.dias || [])) { const x = porDia.get(d.dia) || { dia: d.dia, gasto: 0, impresiones: 0, clics: 0, compras: 0 }; x.gasto += d.gasto; x.impresiones += d.impresiones; x.clics += d.clics; x.compras += d.compras; porDia.set(d.dia, x) }
-    return { ids, dias: [...porDia.values()] }
+    // Conjunto de anuncios: el del anuncio enlazado con gasto más reciente (null si aún no se sincronizó con esa información).
+    const conjunto = [...ids].map((id) => porAd.get(id)?.conjunto).filter(Boolean).sort((a, b) => b.dia.localeCompare(a.dia))[0] || null
+    return { ids, dias: [...porDia.values()], conjunto: conjunto && { id: conjunto.id, nombre: conjunto.nombre } }
   }
   const unidos = cr.map((c) => ({ c, ...diasDe(c) }))
   const usados = new Set(unidos.flatMap((u) => [...u.ids]))
@@ -48,9 +51,9 @@ export async function datosCreativos(uid, { campanaId = null } = {}) {
   const refPorCamp = new Map()
   for (const k of new Set(unidos.map((u) => u.c.campaign_id ?? 'sin'))) refPorCamp.set(k, referenciaDe(unidos.filter((u) => (u.c.campaign_id ?? 'sin') === k).map((u) => u.dias)))
 
-  const creativos = unidos.map(({ c, dias: dd }) => {
+  const creativos = unidos.map(({ c, dias: dd, conjunto }) => {
     const l = leerCreativo(dd, refPorCamp.get(c.campaign_id ?? 'sin'), c.status, hoy)
-    return { id: String(c.id), campanaId: c.campaign_id ? String(c.campaign_id) : null, campana: c.campaign_label, angulo: c.angle, formato: c.format, version: c.version, fecha: c.made_on, nombre: c.name, estado: c.status, estadoDesde: c.status_changed_at, drive: c.drive_url, gancho: c.hook, notas: c.notes, metaAdId: c.meta_ad_id, lectura: l }
+    return { id: String(c.id), campanaId: c.campaign_id ? String(c.campaign_id) : null, campana: c.campaign_label, angulo: c.angle, formato: c.format, version: c.version, fecha: c.made_on, nombre: c.name, estado: c.status, estadoDesde: c.status_changed_at, drive: c.drive_url, gancho: c.hook, notas: c.notes, metaAdId: c.meta_ad_id, conjunto, lectura: l }
   })
 
   // Si se pidió una campaña, todo lo que sigue (resumen, conteos, sin enlazar) es solo de ella.

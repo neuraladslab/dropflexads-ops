@@ -104,17 +104,120 @@ function Editar({ c, sinEnlazar, onCerrar }) {
 function Resumen({ titulo, filas, nombre }) {
   if (!filas.length) return null
   return (
-    <div className="card tbl-card"><div style={{ padding: '14px 16px 4px', fontWeight: 700 }}>{titulo}</div>
+    <div className="cr-res"><div className="cr-res-t">{titulo}</div>
       <div className="scroll-x"><table className="tbl tbl-res"><thead><tr><th>{nombre}</th><th>Creativos</th><th>Funcionan</th><th>A refrescar</th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Costo por compra</th></tr></thead>
         <tbody>{filas.map((f) => <tr key={f.clave}><td><b>{f.clave === 'video' || f.clave === 'imagen' ? FORMATOS[f.clave].nombre : f.clave}</b></td><td>{fmtN(f.creativos)}</td><td>{fmtN(f.funcionan)}</td><td>{fmtN(f.refrescar)}</td><td>{cop(f.gasto)}</td><td>{pct1(f.ctr)}</td><td>{f.cpc == null ? '—' : cop(f.cpc)}</td><td>{f.costoCompra == null ? '—' : cop(f.costoCompra)}</td></tr>)}</tbody></table></div></div>
   )
 }
+
+/** Qué ángulo / qué formato rinde mejor dentro de UNA campaña (suma del gasto y los clics de sus creativos). */
+function resumirPor(items, clave) {
+  const m = new Map()
+  for (const c of items) {
+    const k = clave(c), l = c.lectura, x = m.get(k) || { clave: k, creativos: 0, funcionan: 0, refrescar: 0, gasto: 0, clics: 0, impresiones: 0, compras: 0 }
+    x.creativos++; if (l.etiqueta === 'funciona') x.funcionan++; if (l.etiqueta === 'refrescar') x.refrescar++
+    x.gasto += l.gasto; x.clics += l.clics; x.impresiones += l.impresiones; x.compras += l.compras; m.set(k, x)
+  }
+  return [...m.values()].map((x) => ({ ...x, ctr: x.impresiones ? x.clics / x.impresiones : null, cpc: x.clics ? x.gasto / x.clics : null, costoCompra: x.compras ? x.gasto / x.compras : null })).sort((a, b) => b.gasto - a.gasto)
+}
+
+/** Semáforo de lo que está circulando: qué funciona, qué rinde regular y qué conviene apagar o refrescar. Cada creativo abre su campaña. */
+function Semaforo({ creativos, onAbrir }) {
+  const circ = creativos.filter((c) => c.estado === 'circulando')
+  const cols = [
+    { clave: 'funciona', titulo: 'Funcionando', ayuda: 'Súbeles presupuesto o duplica lo que los hace funcionar.', tono: 'ok', items: circ.filter((c) => c.lectura.etiqueta === 'funciona') },
+    { clave: 'regular', titulo: 'No tan bien', ayuda: 'Ni destacan ni fallan: dales tiempo o prueba una variante.', tono: 'idle', items: circ.filter((c) => c.lectura.etiqueta === 'regular') },
+    { clave: 'refrescar', titulo: 'Conviene apagar o refrescar', ayuda: 'Cuestan más que el resto o están cansados: cambia el creativo o apágalo.', tono: 'bad', items: circ.filter((c) => c.lectura.etiqueta === 'refrescar') },
+  ]
+  if (!cols.some((x) => x.items.length)) return null
+  return (
+    <div className="cr-sem" role="region" aria-label="Resumen de lo que está circulando">
+      {cols.map((x) => (
+        <div key={x.clave} className={'cr-sem-c ' + x.tono}>
+          <div className="cr-sem-h"><b>{x.titulo}</b><span className={'chip ' + x.tono}>{x.items.length}</span></div>
+          <div className="muted" style={{ fontSize: 12.5 }}>{x.ayuda}</div>
+          {x.items.length > 0 && <ul>{x.items.slice(0, 4).map((c) => <li key={c.id}><button type="button" className="cr-sem-b" onClick={() => onAbrir(c.campanaId || 'sin')}><span className="cr-sem-n">{c.nombre}</span><span className="muted">{c.campana || 'Sin campaña'} · {c.lectura.gasto ? cop(c.lectura.gasto) : 'sin gasto'}</span></button></li>)}
+            {x.items.length > 4 && <li className="muted" style={{ fontSize: 12.5 }}>y {x.items.length - 4} más: ábrelos en su campaña</li>}</ul>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const ESTADO_SEL = (c, onEstado) => <select className="sel" aria-label={`Estado de ${c.nombre}`} value={c.estado} onChange={(ev) => onEstado(c, ev.target.value)}>{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.nombre}</option>)}</select>
+
+function FilaCreativo({ c, onEstado, onEditar }) {
+  const l = c.lectura, e = ETIQUETA[l.etiqueta]
+  return (
+    <tr>
+      <td style={{ maxWidth: 320 }}><div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12.5, fontWeight: 700, wordBreak: 'break-all' }}>{c.nombre}</span><Copiar texto={c.nombre} /></div>
+        {c.gancho && <div className="muted" style={{ fontSize: 12.5 }}>{c.gancho}</div>}</td>
+      <td>{c.angulo}<div className="muted" style={{ fontSize: 12.5 }}>{FORMATOS[c.formato].nombre}</div></td>
+      <td>{ESTADO_SEL(c, onEstado)}
+        {l.alertas.length > 0 && <div style={{ color: 'var(--gold-ink)', fontSize: 12.5 }}>⚠ No cuadra con Meta</div>}</td>
+      <td><span className={'chip ' + e.tono}>{e.texto}</span>
+        <details><summary className="muted" style={{ fontSize: 12.5, cursor: 'pointer' }}>por qué</summary><div style={{ fontSize: 12.5, maxWidth: 280 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details></td>
+      <td>{l.gasto ? cop(l.gasto) : '—'}</td><td>{pct1(l.ctr)}</td><td>{l.cpc == null ? '—' : cop(l.cpc)}</td><td>{l.gasto ? fmtN(l.compras) : '—'}</td>
+      <td style={{ whiteSpace: 'nowrap' }}>{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Drive</a>} <button type="button" className="btn ghost" style={{ padding: '4px 10px' }} onClick={() => onEditar(c)}>Editar</button></td>
+    </tr>
+  )
+}
+
+function TarjetaCreativo({ c, onEstado, onEditar }) {
+  const l = c.lectura, e = ETIQUETA[l.etiqueta]
+  return (
+    <article className="card cr-card">
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <span className="cr-nombre">{c.nombre}</span><Copiar texto={c.nombre} />
+      </div>
+      <div className="muted" style={{ fontSize: 13 }}>{c.angulo} · {FORMATOS[c.formato].nombre}</div>
+      {c.gancho && <div className="muted" style={{ fontSize: 12.5 }}>{c.gancho}</div>}
+      <div className="cr-fila">
+        {ESTADO_SEL(c, onEstado)}
+        <span className={'chip ' + e.tono}>{e.texto}</span>
+      </div>
+      <dl className="cr-datos">
+        <div><dt>Gasto (sin IVA)</dt><dd>{l.gasto ? cop(l.gasto) : '—'}</dd></div>
+        <div><dt>CTR</dt><dd>{pct1(l.ctr)}</dd></div>
+        <div><dt>Costo por clic</dt><dd>{l.cpc == null ? '—' : cop(l.cpc)}</dd></div>
+        <div><dt>Compras</dt><dd>{l.gasto ? fmtN(l.compras) : '—'}</dd></div>
+      </dl>
+      <details className="cr-por"><summary>Por qué esta lectura</summary><div style={{ fontSize: 13 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details>
+      {l.alertas.length > 0 && <div style={{ color: 'var(--gold-ink)', fontSize: 13 }}>⚠ No cuadra con Meta</div>}
+      <div className="cr-fila">{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Abrir en Drive</a>}<button type="button" className="btn ghost sm" onClick={() => onEditar(c)}>Editar</button></div>
+    </article>
+  )
+}
+
+/** Campaña → conjunto de anuncios → creativos. Los creativos sin anuncio sincronizado (o sin conjunto aún) van juntos en «Sin conjunto asignado». */
+function agrupar(lista, campanas) {
+  const porCamp = new Map()
+  for (const c of lista) { const k = c.campanaId || 'sin'; if (!porCamp.has(k)) porCamp.set(k, []); porCamp.get(k).push(c) }
+  const orden = [...campanas.map((c) => c.id), 'sin'].filter((k) => porCamp.has(k))
+  return orden.map((k) => {
+    const items = porCamp.get(k), cj = new Map()
+    for (const c of items) { const kc = c.conjunto ? c.conjunto.id : 'sin'; const x = cj.get(kc) || { key: kc, id: c.conjunto ? c.conjunto.id : null, nombre: c.conjunto ? c.conjunto.nombre : 'Sin conjunto asignado', items: [], gasto: 0 }; x.items.push(c); x.gasto += c.lectura.gasto; cj.set(kc, x) }
+    const conjuntos = [...cj.values()].sort((a, b) => (a.id ? 0 : 1) - (b.id ? 0 : 1) || b.gasto - a.gasto)
+    return {
+      key: k, nombre: k === 'sin' ? 'Sin campaña' : (campanas.find((c) => c.id === k) || {}).nombre || 'Campaña', items, conjuntos,
+      gasto: items.reduce((a, c) => a + c.lectura.gasto, 0), funcionan: items.filter((c) => c.lectura.etiqueta === 'funciona').length,
+      refrescar: items.filter((c) => c.lectura.etiqueta === 'refrescar').length, alertas: items.filter((c) => c.lectura.alertas.length).length,
+    }
+  })
+}
+const alternar = (set, k) => set((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k)
+  return n })
 
 export default function Creativos({ d, campanaFija = null }) {
   const router = useRouter()
   const [nuevo, setNuevo] = useState(false), [editando, setEditando] = useState(null), [error, setError] = useState('')
   const [fc, setFc] = useState(campanaFija || ''), [fe, setFe] = useState(''), [ff, setFf] = useState(''), [fl, setFl] = useState(''), [q, setQ] = useState('')
   const lista = useMemo(() => (d.creativos || []).filter((c) => (!fc || c.campanaId === fc) && (!fe || c.estado === fe) && (!ff || c.formato === ff) && (!fl || c.lectura.etiqueta === fl) && (!q || (c.nombre + ' ' + c.angulo + ' ' + (c.gancho || '')).toUpperCase().includes(q.trim().toUpperCase()))), [d.creativos, fc, fe, ff, fl, q])
+  const grupos = useMemo(() => agrupar(lista, d.campanas || []), [lista, d.campanas])
+  const filtrando = !!(fe || ff || fl || q.trim() || (fc && !campanaFija))
+  // Con una sola campaña (o dentro de una campaña) se abre sola; con varias, empiezan plegadas y se despliega la que interesa.
+  const [abiertas, setAbiertas] = useState(() => new Set(campanaFija || (d.campanas || []).length <= 1 ? [campanaFija || (d.campanas[0] || {}).id].filter(Boolean) : []))
+  const [cerrados, setCerrados] = useState(() => new Set())
   if (d.sinMigracion) return <div className="tint warn"><b style={{ color: 'var(--gold-ink)' }}>Falta preparar la base de datos</b><div style={{ fontSize: 14, marginTop: 4 }}>Este módulo necesita dos tablas nuevas. Ejecuta <code>npm run db:migrate</code> (solo agrega tablas; no toca nada existente) y recarga.</div></div>
   const alertas = d.creativos.filter((c) => c.lectura.alertas.length)
   async function cambiarEstado(c, estado) {
@@ -134,6 +237,8 @@ export default function Creativos({ d, campanaFija = null }) {
       )}
       {!d.hayGastoPorAnuncio && d.creativos.length > 0 && <p className="muted" style={{ fontSize: 13.5 }}>Todavía no hay gasto por anuncio de Meta. Sincroniza en Mis cuentas → Meta Ads; los resultados aparecen cuando el anuncio en Meta se llama igual que el creativo.</p>}
 
+      {!campanaFija && <Semaforo creativos={d.creativos} onAbrir={(k) => setAbiertas((s0) => new Set(s0).add(k))} />}
+
       <div className="card" style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end' }}>
         <div className="field" style={{ flex: '1 1 200px' }}><label htmlFor="f-q">Buscar</label><div className="inp"><input id="f-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, ángulo o gancho" /></div></div>
         {!campanaFija && <div className="field"><label htmlFor="f-c">Campaña</label><select id="f-c" className="sel" value={fc} onChange={(e) => setFc(e.target.value)}><option value="">Todas</option>{d.campanas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></div>}
@@ -146,47 +251,64 @@ export default function Creativos({ d, campanaFija = null }) {
       {lista.length === 0 ? (
         <div className="card"><p className="empty-note" style={{ margin: 0 }}>{d.creativos.length ? 'Ningún creativo coincide con los filtros.' : 'Aún no tienes creativos. Crea el primero: la app arma el nombre y tú lo usas igual en Meta y en Drive.'}</p></div>
       ) : (
-        <div className="cr-wrap"><div className="card tbl-card cr-tabla"><div className="scroll-x"><table className="tbl">
-          <thead><tr><th>Creativo</th><th>Campaña / ángulo</th><th>Estado</th><th>Lectura<Ayuda texto={AYUDA_LECTURA} titulo="Lectura" /></th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Compras</th><th></th></tr></thead>
-          <tbody>{lista.map((c) => { const l = c.lectura, e = ETIQUETA[l.etiqueta]; return (
-            <tr key={c.id}>
-              <td style={{ maxWidth: 320 }}><div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12.5, fontWeight: 700, wordBreak: 'break-all' }}>{c.nombre}</span><Copiar texto={c.nombre} /></div>
-                {c.gancho && <div className="muted" style={{ fontSize: 12.5 }}>{c.gancho}</div>}</td>
-              <td>{c.campana}<div className="muted" style={{ fontSize: 12.5 }}>{c.angulo} · {FORMATOS[c.formato].nombre}</div></td>
-              <td><select className="sel" aria-label={`Estado de ${c.nombre}`} value={c.estado} onChange={(ev) => cambiarEstado(c, ev.target.value)}>{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.nombre}</option>)}</select>
-                {l.alertas.length > 0 && <div style={{ color: 'var(--gold-ink)', fontSize: 12.5 }}>⚠ No cuadra con Meta</div>}</td>
-              <td><span className={'chip ' + e.tono}>{e.texto}</span>
-                <details><summary className="muted" style={{ fontSize: 12.5, cursor: 'pointer' }}>por qué</summary><div style={{ fontSize: 12.5, maxWidth: 280 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details></td>
-              <td>{l.gasto ? cop(l.gasto) : '—'}</td><td>{pct1(l.ctr)}</td><td>{l.cpc == null ? '—' : cop(l.cpc)}</td><td>{l.gasto ? fmtN(l.compras) : '—'}</td>
-              <td style={{ whiteSpace: 'nowrap' }}>{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Drive</a>} <button type="button" className="btn ghost" style={{ padding: '4px 10px' }} onClick={() => setEditando(c)}>Editar</button></td>
-            </tr>) })}</tbody></table></div></div>
-        {/* Celular: una tarjeta por creativo (la tabla no cabe) */}
-        <div className="cr-lista">
-          {lista.map((c) => { const l = c.lectura, e = ETIQUETA[l.etiqueta]; return (
-            <article key={c.id} className="card cr-card">
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                <span className="cr-nombre">{c.nombre}</span><Copiar texto={c.nombre} />
-              </div>
-              <div className="muted" style={{ fontSize: 13 }}>{c.campana} · {c.angulo} · {FORMATOS[c.formato].nombre}</div>
-              {c.gancho && <div className="muted" style={{ fontSize: 12.5 }}>{c.gancho}</div>}
-              <div className="cr-fila">
-                <select className="sel" aria-label={`Estado de ${c.nombre}`} value={c.estado} onChange={(ev) => cambiarEstado(c, ev.target.value)}>{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.nombre}</option>)}</select>
-                <span className={'chip ' + e.tono}>{e.texto}</span>
-              </div>
-              <dl className="cr-datos">
-                <div><dt>Gasto (sin IVA)</dt><dd>{l.gasto ? cop(l.gasto) : '—'}</dd></div>
-                <div><dt>CTR</dt><dd>{pct1(l.ctr)}</dd></div>
-                <div><dt>Costo por clic</dt><dd>{l.cpc == null ? '—' : cop(l.cpc)}</dd></div>
-                <div><dt>Compras</dt><dd>{l.gasto ? fmtN(l.compras) : '—'}</dd></div>
-              </dl>
-              <details className="cr-por"><summary>Por qué esta lectura</summary><div style={{ fontSize: 13 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details>
-              {l.alertas.length > 0 && <div style={{ color: 'var(--gold-ink)', fontSize: 13 }}>⚠ No cuadra con Meta</div>}
-              <div className="cr-fila">{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Abrir en Drive</a>}<button type="button" className="btn ghost sm" onClick={() => setEditando(c)}>Editar</button></div>
-            </article>) })}
-        </div></div>
+        <>
+          {grupos.length > 1 && !filtrando && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <button type="button" className="btn ghost sm" onClick={() => setAbiertas(new Set(grupos.map((g) => g.key)))}>Desplegar todo</button>
+              <button type="button" className="btn ghost sm" onClick={() => setAbiertas(new Set())}>Plegar todo</button>
+            </div>
+          )}
+          <div className="cr-grupos">
+            {grupos.map((g) => {
+              const abierta = filtrando || abiertas.has(g.key), idCuerpo = 'cr-g-' + g.key
+              return (
+                <section key={g.key} className="card tbl-card cr-grupo">
+                  <button type="button" className="cr-gh" aria-expanded={abierta} aria-controls={idCuerpo} onClick={() => alternar(setAbiertas, g.key)} disabled={filtrando}>
+                    <span className="cr-chev" aria-hidden="true">▸</span>
+                    <span className="cr-gt"><b>{g.nombre}</b><span className="muted">{fmtN(g.items.length)} {g.items.length === 1 ? 'creativo' : 'creativos'}{g.conjuntos.length > 1 || g.conjuntos[0]?.id ? ` · ${fmtN(g.conjuntos.length)} ${g.conjuntos.length === 1 ? 'conjunto' : 'conjuntos'}` : ''}</span></span>
+                    <span className="cr-gr">
+                      {g.funcionan > 0 && <span className="chip ok">{g.funcionan} {g.funcionan === 1 ? 'funciona' : 'funcionan'}</span>}
+                      {g.refrescar > 0 && <span className="chip bad">{g.refrescar} a refrescar</span>}
+                      {g.alertas > 0 && <span className="chip warn">⚠ {g.alertas}</span>}
+                      <span className="cr-gasto">{g.gasto ? cop(g.gasto) : '—'}</span>
+                    </span>
+                  </button>
+                  {abierta && (
+                    <div id={idCuerpo} className="cr-gb">
+                      {g.conjuntos.every((cj) => !cj.id) && d.hayGastoPorAnuncio && <p className="muted" style={{ fontSize: 13, margin: 0, padding: '10px 16px' }}>Aún no se conoce el conjunto de anuncios de estos creativos. Sincroniza en Mis cuentas → Meta Ads y se acomodan solos.</p>}
+                      {g.conjuntos.map((cj) => {
+                        const kc = g.key + ':' + cj.key, conTitulo = true, cerrado = !filtrando && cerrados.has(kc)
+                        return (
+                          <div key={cj.key} className="cr-cj">
+                            {conTitulo && (
+                              <button type="button" className="cr-ch" aria-expanded={!cerrado} onClick={() => alternar(setCerrados, kc)} disabled={filtrando}>
+                                <span className="cr-chev" aria-hidden="true">▸</span>
+                                <span className="cr-gt"><b>{cj.nombre}</b><span className="muted">Conjunto de anuncios · {fmtN(cj.items.length)} {cj.items.length === 1 ? 'creativo' : 'creativos'}</span></span>
+                                <span className="cr-gasto">{cj.gasto ? cop(cj.gasto) : '—'}</span>
+                              </button>
+                            )}
+                            {!cerrado && (
+                              <>
+                                <div className="cr-tabla scroll-x"><table className="tbl">
+                                  <thead><tr><th>Creativo</th><th>Ángulo</th><th>Estado</th><th>Lectura<Ayuda texto={AYUDA_LECTURA} titulo="Lectura" /></th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Compras</th><th></th></tr></thead>
+                                  <tbody>{cj.items.map((c) => <FilaCreativo key={c.id} c={c} onEstado={cambiarEstado} onEditar={setEditando} />)}</tbody></table></div>
+                                {/* Celular: una tarjeta por creativo (la tabla no cabe) */}
+                                <div className="cr-lista cr-lista-g">{cj.items.map((c) => <TarjetaCreativo key={c.id} c={c} onEstado={cambiarEstado} onEditar={setEditando} />)}</div>
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
+                      <div className="cr-resumenes"><Resumen titulo="¿Qué ángulo rinde mejor?" nombre="Ángulo" filas={resumirPor(g.items, (c) => c.angulo.toUpperCase())} /><Resumen titulo="¿Video o imagen?" nombre="Formato" filas={resumirPor(g.items, (c) => c.formato)} /></div>
+                    </div>
+                  )}
+                </section>
+              )
+            })}
+          </div>
+        </>
       )}
 
-      {d.creativos.length > 0 && <div style={{ display: 'grid', gap: 14, marginTop: 20 }}><Resumen titulo="¿Qué ángulo rinde mejor?" nombre="Ángulo" filas={d.resumen.porAngulo} /><Resumen titulo="¿Video o imagen?" nombre="Formato" filas={d.resumen.porFormato} /></div>}
 
       {d.sinEnlazar.length > 0 && (
         <details className="card" style={{ marginTop: 20 }}><summary style={{ cursor: 'pointer', fontWeight: 700 }}>Anuncios de Meta sin creativo ({d.sinEnlazar.length})</summary>
