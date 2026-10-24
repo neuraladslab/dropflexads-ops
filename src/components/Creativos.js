@@ -144,17 +144,17 @@ function Semaforo({ creativos, onAbrir }) {
   )
 }
 
-/** Ángulo y formato en un solo plegable, y solo cuando comparan algo: hay gasto, o más de un creativo comparte ángulo o formato. Si no, repetiría la lista de arriba. */
+/** Ángulo y formato en un solo plegable, y solo cuando comparan algo nuevo: hay gasto y algún ángulo o formato junta 2+ creativos.
+ *  Con un creativo por grupo sería la misma fila de la tabla de arriba (mismo gasto, CTR y costos). */
 function Comparativa({ items }) {
+  if (!items.some((c) => c.lectura.gasto > 0)) return null
   const ang = resumirPor(items, (c) => c.angulo.toUpperCase()), fmt = resumirPor(items, (c) => c.formato)
-  const conGasto = items.some((c) => c.lectura.gasto > 0)
-  const compara = (f) => f.length > 1 || f.some((x) => x.creativos > 1)
+  const compara = (f) => f.length > 1 && f.some((x) => x.creativos > 1)
   const util = [compara(ang) && { titulo: '¿Qué ángulo rinde mejor?', nombre: 'Ángulo', filas: ang }, compara(fmt) && { titulo: '¿Video o imagen?', nombre: 'Formato', filas: fmt }].filter(Boolean)
-  if (!util.length || (!conGasto && items.length < 3)) return null
+  if (!util.length) return null
   return (
-    <details className="cr-resumenes" open={conGasto}>
+    <details className="cr-resumenes" open>
       <summary>Comparar por ángulo y formato</summary>
-      {!conGasto && <p className="muted" style={{ fontSize: 13, margin: '6px 0 0' }}>Aún sin gasto de Meta: solo cuenta cuántos creativos hay de cada uno.</p>}
       {util.map((u) => <Resumen key={u.nombre} titulo={u.titulo} nombre={u.nombre} filas={u.filas} />)}
     </details>
   )
@@ -162,7 +162,7 @@ function Comparativa({ items }) {
 
 const ESTADO_SEL = (c, onEstado) => <select className="sel" aria-label={`Estado de ${c.nombre}`} value={c.estado} onChange={(ev) => onEstado(c, ev.target.value)}>{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.nombre}</option>)}</select>
 
-function FilaCreativo({ c, onEstado, onEditar }) {
+function FilaCreativo({ c, onEstado, onEditar, conMetricas }) {
   const l = c.lectura, e = ETIQUETA[l.etiqueta]
   return (
     <tr>
@@ -174,7 +174,7 @@ function FilaCreativo({ c, onEstado, onEditar }) {
         {(l.gasto > 0 || l.alertas.length > 0) && <details><summary className="muted" style={{ fontSize: 12.5, cursor: 'pointer' }}>por qué</summary><div style={{ fontSize: 12.5, maxWidth: 280 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details>}</td>
       {l.gasto > 0
         ? <><td>{cop(l.gasto)}</td><td>{pct1(l.ctr)}</td><td>{l.cpc == null ? '—' : cop(l.cpc)}</td><td>{fmtN(l.compras)}</td></>
-        : <td colSpan={4} className="muted" style={{ fontSize: 13 }}>Aún sin gasto en Meta</td>}
+        : <td colSpan={conMetricas ? 4 : 1} className="muted" style={{ fontSize: 13 }}>Aún sin gasto en Meta</td>}
       <td style={{ whiteSpace: 'nowrap' }}>{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Drive</a>} <button type="button" className="btn ghost" style={{ padding: '4px 10px' }} onClick={() => onEditar(c)}>Editar</button></td>
     </tr>
   )
@@ -308,8 +308,8 @@ export default function Creativos({ d, campanaFija = null }) {
                             {!cerrado && (
                               <>
                                 <div className="cr-tabla scroll-x"><table className="tbl">
-                                  <thead><tr><th>Creativo</th><th>Estado</th><th>Lectura<Ayuda texto={AYUDA_LECTURA} titulo="Lectura" /></th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Compras</th><th></th></tr></thead>
-                                  <tbody>{cj.items.map((c) => <FilaCreativo key={c.id} c={c} onEstado={cambiarEstado} onEditar={setEditando} />)}</tbody></table></div>
+                                  <thead><tr><th>Creativo</th><th>Estado</th><th>Lectura<Ayuda texto={AYUDA_LECTURA} titulo="Lectura" /></th>{cj.items.some((c) => c.lectura.gasto > 0) ? <><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Compras</th></> : <th>Resultados</th>}<th></th></tr></thead>
+                                  <tbody>{cj.items.map((c) => <FilaCreativo key={c.id} c={c} conMetricas={cj.items.some((x) => x.lectura.gasto > 0)} onEstado={cambiarEstado} onEditar={setEditando} />)}</tbody></table></div>
                                 {/* Celular: una tarjeta por creativo (la tabla no cabe) */}
                                 <div className="cr-lista cr-lista-g">{cj.items.map((c) => <TarjetaCreativo key={c.id} c={c} onEstado={cambiarEstado} onEditar={setEditando} />)}</div>
                               </>
