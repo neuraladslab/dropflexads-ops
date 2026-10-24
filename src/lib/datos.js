@@ -243,7 +243,7 @@ export const datosCampanas = (uid, m = new Map(), rango = null) => memo(m, rango
 const enRango = (rango, f) => !rango || (!!f && f >= rango.desde && f <= rango.hasta)
 async function _datosCampanas(uid, m, rango) {
   const inicio = await inicioDe(uid, m)
-  const [p, camps, gan, devs, prods, gastos, [con]] = await Promise.all([
+  const [p, camps, gan, devs, prods, gastos, [con], manuales] = await Promise.all([
     datosPedidos(uid, m),
     sql`SELECT id, name, product_ids, active, meta_campaign_id FROM campaigns WHERE owner_id = ${uid} ORDER BY created_at, id`,
     sql`SELECT w.order_ref, w.guide, w.amount::float8 AS amount FROM wallet_movements w WHERE w.owner_id = ${uid} AND w.kind = 'profit' AND NOT EXISTS (SELECT 1 FROM wallet_movements r WHERE r.owner_id = w.owner_id AND r.reverses = w.external_id)`,
@@ -251,6 +251,7 @@ async function _datosCampanas(uid, m, rango) {
     sql`SELECT status, created_date::text AS creado, product_ids, product_names FROM dropi_orders WHERE owner_id = ${uid}`,
     sql`SELECT meta_campaign_id AS id, sum(spend)::float8 AS spend FROM meta_spend_daily WHERE owner_id = ${uid} AND day >= ${rango && rango.desde > inicio ? rango.desde : inicio} AND day <= ${rango ? rango.hasta : '9999-12-31'} GROUP BY 1`,
     conexionMeta(uid, m),
+    sql`SELECT product_id AS pid, name FROM dropi_products WHERE owner_id = ${uid}`.catch(() => []), // la tabla llega con la migración
   ])
   const vat = con ? con.vat : 19
   const gastoMeta = new Map(gastos.map((g) => [g.id, g.spend]))
@@ -265,6 +266,7 @@ async function _datosCampanas(uid, m, rango) {
     if (!seImporta(r.status) || !dentroDeOperacion(r.creado, inicio)) continue
     ;(r.product_ids || []).forEach((id, i) => { const c = cuenta.get(id) || { pid: id, nombre: (r.product_names || [])[i] || 'Producto ' + id, n: 0 }; c.n++; cuenta.set(id, c) })
   }
+  for (const x of manuales) if (!cuenta.has(x.pid)) cuenta.set(x.pid, { pid: x.pid, nombre: x.name, n: 0 }) // agregados por ID: aún sin pedidos
   const productosOrden = [...cuenta.values()].sort((a, b) => b.n - a.n || a.pid.localeCompare(b.pid))
   const nombreProd = new Map(productosOrden.map((x) => [x.pid, x.nombre]))
   const pctDev = new Map((await sql`SELECT id, return_pct::float8 AS p FROM campaigns WHERE owner_id = ${uid}`.catch(() => [])).map((r) => [String(r.id), r.p])) // la columna llega con la migración
