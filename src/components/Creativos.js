@@ -101,26 +101,6 @@ function Editar({ c, sinEnlazar, onCerrar }) {
   )
 }
 
-function Resumen({ titulo, filas, nombre }) {
-  if (!filas.length) return null
-  return (
-    <div className="cr-res"><div className="cr-res-t">{titulo}</div>
-      <div className="scroll-x"><table className="tbl tbl-res"><thead><tr><th>{nombre}</th><th>Creativos</th><th>Funcionan</th><th>A refrescar</th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Costo por compra</th></tr></thead>
-        <tbody>{filas.map((f) => <tr key={f.clave}><td><b>{f.clave === 'video' || f.clave === 'imagen' ? FORMATOS[f.clave].nombre : f.clave}</b></td><td>{fmtN(f.creativos)}</td><td>{fmtN(f.funcionan)}</td><td>{fmtN(f.refrescar)}</td><td>{cop(f.gasto)}</td><td>{pct1(f.ctr)}</td><td>{f.cpc == null ? '—' : cop(f.cpc)}</td><td>{f.costoCompra == null ? '—' : cop(f.costoCompra)}</td></tr>)}</tbody></table></div></div>
-  )
-}
-
-/** Qué ángulo / qué formato rinde mejor dentro de UNA campaña (suma del gasto y los clics de sus creativos). */
-function resumirPor(items, clave) {
-  const m = new Map()
-  for (const c of items) {
-    const k = clave(c), l = c.lectura, x = m.get(k) || { clave: k, creativos: 0, funcionan: 0, refrescar: 0, gasto: 0, clics: 0, impresiones: 0, compras: 0 }
-    x.creativos++; if (l.etiqueta === 'funciona') x.funcionan++; if (l.etiqueta === 'refrescar') x.refrescar++
-    x.gasto += l.gasto; x.clics += l.clics; x.impresiones += l.impresiones; x.compras += l.compras; m.set(k, x)
-  }
-  return [...m.values()].map((x) => ({ ...x, ctr: x.impresiones ? x.clics / x.impresiones : null, cpc: x.clics ? x.gasto / x.clics : null, costoCompra: x.compras ? x.gasto / x.compras : null })).sort((a, b) => b.gasto - a.gasto)
-}
-
 /** Semáforo de lo que está circulando: qué funciona, qué rinde regular y qué conviene apagar o refrescar. Cada creativo abre su campaña. */
 function Semaforo({ creativos, onAbrir }) {
   const circ = creativos.filter((c) => c.estado === 'circulando')
@@ -146,18 +126,19 @@ function Semaforo({ creativos, onAbrir }) {
 
 const ESTADO_SEL = (c, onEstado) => <select className="sel" aria-label={`Estado de ${c.nombre}`} value={c.estado} onChange={(ev) => onEstado(c, ev.target.value)}>{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.nombre}</option>)}</select>
 
-function FilaCreativo({ c, onEstado, onEditar }) {
+function FilaCreativo({ c, onEstado, onEditar, conMetricas }) {
   const l = c.lectura, e = ETIQUETA[l.etiqueta]
   return (
     <tr>
       <td style={{ maxWidth: 320 }}><div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12.5, fontWeight: 700, wordBreak: 'break-all' }}>{c.nombre}</span><Copiar texto={c.nombre} /></div>
-        {c.gancho && <div className="muted" style={{ fontSize: 12.5 }}>{c.gancho}</div>}</td>
-      <td>{c.angulo}<div className="muted" style={{ fontSize: 12.5 }}>{FORMATOS[c.formato].nombre}</div></td>
+        <div className="muted" style={{ fontSize: 12.5 }}>{c.angulo} · {FORMATOS[c.formato].nombre}</div></td>
       <td>{ESTADO_SEL(c, onEstado)}
         {l.alertas.length > 0 && <div style={{ color: 'var(--gold-ink)', fontSize: 12.5 }}>⚠ No cuadra con Meta</div>}</td>
       <td><span className={'chip ' + e.tono}>{e.texto}</span>
-        <details><summary className="muted" style={{ fontSize: 12.5, cursor: 'pointer' }}>por qué</summary><div style={{ fontSize: 12.5, maxWidth: 280 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details></td>
-      <td>{l.gasto ? cop(l.gasto) : '—'}</td><td>{pct1(l.ctr)}</td><td>{l.cpc == null ? '—' : cop(l.cpc)}</td><td>{l.gasto ? fmtN(l.compras) : '—'}</td>
+        {(l.gasto > 0 || l.alertas.length > 0) && <details><summary className="muted" style={{ fontSize: 12.5, cursor: 'pointer' }}>por qué</summary><div style={{ fontSize: 12.5, maxWidth: 280 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details>}</td>
+      {l.gasto > 0
+        ? <><td>{cop(l.gasto)}</td><td>{pct1(l.ctr)}</td><td>{l.cpc == null ? '—' : cop(l.cpc)}</td><td>{fmtN(l.compras)}</td></>
+        : <td colSpan={conMetricas ? 4 : 1} className="muted" style={{ fontSize: 13 }}>Aún sin gasto en Meta</td>}
       <td style={{ whiteSpace: 'nowrap' }}>{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Drive</a>} <button type="button" className="btn ghost" style={{ padding: '4px 10px' }} onClick={() => onEditar(c)}>Editar</button></td>
     </tr>
   )
@@ -176,14 +157,15 @@ function TarjetaCreativo({ c, onEstado, onEditar }) {
         {ESTADO_SEL(c, onEstado)}
         <span className={'chip ' + e.tono}>{e.texto}</span>
       </div>
-      <dl className="cr-datos">
-        <div><dt>Gasto (sin IVA)</dt><dd>{l.gasto ? cop(l.gasto) : '—'}</dd></div>
-        <div><dt>CTR</dt><dd>{pct1(l.ctr)}</dd></div>
-        <div><dt>Costo por clic</dt><dd>{l.cpc == null ? '—' : cop(l.cpc)}</dd></div>
-        <div><dt>Compras</dt><dd>{l.gasto ? fmtN(l.compras) : '—'}</dd></div>
-      </dl>
-      <details className="cr-por"><summary>Por qué esta lectura</summary><div style={{ fontSize: 13 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details>
-      {l.alertas.length > 0 && <div style={{ color: 'var(--gold-ink)', fontSize: 13 }}>⚠ No cuadra con Meta</div>}
+      {l.gasto > 0 ? (
+        <dl className="cr-datos">
+          <div><dt>Gasto (sin IVA)</dt><dd>{cop(l.gasto)}</dd></div>
+          <div><dt>CTR</dt><dd>{pct1(l.ctr)}</dd></div>
+          <div><dt>Costo por clic</dt><dd>{l.cpc == null ? '—' : cop(l.cpc)}</dd></div>
+          <div><dt>Compras</dt><dd>{fmtN(l.compras)}</dd></div>
+        </dl>
+      ) : <div className="muted" style={{ fontSize: 13 }}>Aún sin gasto en Meta</div>}
+      {(l.gasto > 0 || l.alertas.length > 0) && <details className="cr-por"><summary>Por qué esta lectura{l.alertas.length > 0 ? ' · ⚠ no cuadra con Meta' : ''}</summary><div style={{ fontSize: 13 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details>}
       <div className="cr-fila">{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Abrir en Drive</a>}<button type="button" className="btn ghost sm" onClick={() => onEditar(c)}>Editar</button></div>
     </article>
   )
@@ -290,8 +272,8 @@ export default function Creativos({ d, campanaFija = null }) {
                             {!cerrado && (
                               <>
                                 <div className="cr-tabla scroll-x"><table className="tbl">
-                                  <thead><tr><th>Creativo</th><th>Ángulo</th><th>Estado</th><th>Lectura<Ayuda texto={AYUDA_LECTURA} titulo="Lectura" /></th><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Compras</th><th></th></tr></thead>
-                                  <tbody>{cj.items.map((c) => <FilaCreativo key={c.id} c={c} onEstado={cambiarEstado} onEditar={setEditando} />)}</tbody></table></div>
+                                  <thead><tr><th>Creativo</th><th>Estado</th><th>Lectura<Ayuda texto={AYUDA_LECTURA} titulo="Lectura" /></th>{cj.items.some((c) => c.lectura.gasto > 0) ? <><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Compras</th></> : <th>Resultados</th>}<th></th></tr></thead>
+                                  <tbody>{cj.items.map((c) => <FilaCreativo key={c.id} c={c} conMetricas={cj.items.some((x) => x.lectura.gasto > 0)} onEstado={cambiarEstado} onEditar={setEditando} />)}</tbody></table></div>
                                 {/* Celular: una tarjeta por creativo (la tabla no cabe) */}
                                 <div className="cr-lista cr-lista-g">{cj.items.map((c) => <TarjetaCreativo key={c.id} c={c} onEstado={cambiarEstado} onEditar={setEditando} />)}</div>
                               </>
@@ -299,7 +281,6 @@ export default function Creativos({ d, campanaFija = null }) {
                           </div>
                         )
                       })}
-                      <div className="cr-resumenes"><Resumen titulo="¿Qué ángulo rinde mejor?" nombre="Ángulo" filas={resumirPor(g.items, (c) => c.angulo.toUpperCase())} /><Resumen titulo="¿Video o imagen?" nombre="Formato" filas={resumirPor(g.items, (c) => c.formato)} /></div>
                     </div>
                   )}
                 </section>
