@@ -341,3 +341,12 @@ CREATE TABLE IF NOT EXISTS meta_ad_spend_daily (
   PRIMARY KEY (owner_id, day, meta_ad_id)
 );
 CREATE INDEX IF NOT EXISTS idx_meta_ad_spend_owner_day ON meta_ad_spend_daily (owner_id, day DESC);
+
+-- Productos de Dropi agregados a mano por su ID (nombre consultado en Dropi): permiten armar una campaña antes de vender el producto.
+CREATE TABLE IF NOT EXISTS dropi_products (
+  owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id VARCHAR(12) NOT NULL,
+  name VARCHAR(250) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (owner_id, product_id)
+);
