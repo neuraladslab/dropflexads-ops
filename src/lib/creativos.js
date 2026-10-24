@@ -21,6 +21,7 @@ export async function datosCreativos(uid, { campanaId = null } = {}) {
     if (e && e.code === SIN_TABLA) return { sinMigracion: true }
     throw e
   }
+  const nCopies = new Map((await sql`SELECT creative_id, count(*)::int AS n FROM creative_copies WHERE owner_id = ${uid} GROUP BY 1`.catch(() => [])).map((r) => [String(r.creative_id), r.n])) // la tabla llega con la migración
   const camp = await sql`SELECT id, name, active, meta_campaign_id FROM campaigns WHERE owner_id = ${uid} ORDER BY active DESC, name`
   const hoy = hoyBogota()
 
@@ -53,7 +54,7 @@ export async function datosCreativos(uid, { campanaId = null } = {}) {
 
   const creativos = unidos.map(({ c, dias: dd, conjunto }) => {
     const l = leerCreativo(dd, refPorCamp.get(c.campaign_id ?? 'sin'), c.status, hoy)
-    return { id: String(c.id), campanaId: c.campaign_id ? String(c.campaign_id) : null, campana: c.campaign_label, angulo: c.angle, formato: c.format, version: c.version, fecha: c.made_on, nombre: c.name, estado: c.status, estadoDesde: c.status_changed_at, drive: c.drive_url, gancho: c.hook, notas: c.notes, metaAdId: c.meta_ad_id, conjunto, lectura: l }
+    return { id: String(c.id), campanaId: c.campaign_id ? String(c.campaign_id) : null, campana: c.campaign_label, angulo: c.angle, formato: c.format, version: c.version, fecha: c.made_on, nombre: c.name, estado: c.status, estadoDesde: c.status_changed_at, drive: c.drive_url, gancho: c.hook, notas: c.notes, metaAdId: c.meta_ad_id, conjunto, copies: nCopies.get(String(c.id)) || 0, lectura: l }
   })
 
   // Si se pidió una campaña, todo lo que sigue (resumen, conteos, sin enlazar) es solo de ella.

@@ -66,3 +66,46 @@ test('IA: el SDK real arma la petición con la forma correcta (cabeceras y cuerp
     assert.deepEqual(r.noVerificadas, ['$808.724'])
   } finally { srv.close() }
 })
+
+import { pedirCopies } from './copiasIA.js'
+
+const copy = (i, principal, f = 'AIDA') => ({ formula: f, texto_principal: principal, titulo: ['Colágeno con 12 vitaminas', 'Más soltura cada día', 'Tu rutina, más simple', 'Cuida tu movilidad', 'Bienestar para tu día'][i - 1], descripcion: 'Pídelo hoy 🚚' })
+const tanda = (principales) => texto(JSON.stringify({ copies: principales.map((p, i) => copy(i + 1, p, i < 3 ? 'AIDA' : 'PAS')) }))
+const ctxCopies = { campana: 'CLAGEN | Colageno | v1', productos: ['Colágeno hidrolizado 12 vitaminas'], angulo: 'Movilidad y articulaciones', formato: 'video', gancho: null }
+const limpios = ['✨ Más soltura para tu día. Colágeno con 12 vitaminas 💪 Pídelo hoy.', '🌿 Una rutina simple con 12 vitaminas. Conoce más 👇', '💪 Acompaña tu movimiento diario. Escríbenos y pídelo.', '✨ Un día largo pide buen soporte. Colágeno con 12 vitaminas 🚚', '🌟 Para quienes cuidan su movilidad. Pídelo hoy 💪']
+
+test('copies IA: una tanda limpia se entrega con una sola llamada, con la instrucción de normas y sin parámetros que Opus 5.5 rechaza', async () => {
+  const c = falso(tanda(limpios)), usos = []
+  const r = await pedirCopies({ client: c, modelo: 'claude-opus-5-5', contexto: ctxCopies, alUsar: (u) => usos.push(u) })
+  assert.equal(r.copies.length, 5); assert.equal(r.llamadas, 1); assert.equal(usos.length, 1)
+  assert.deepEqual(r.copies.map((x) => x.avisos.length), [0, 0, 0, 0, 0])
+  const p = c.pedidos[0]
+  assert.match(p.system, /ATRIBUTOS PERSONALES/); assert.match(p.system, /AIDA/); assert.match(p.system, /PAS/)
+  assert.match(p.messages[0].content, /<angulo>Movilidad y articulaciones<\/angulo>/)
+  for (const prohibido of ['temperature', 'top_p', 'top_k', 'budget_tokens', 'tool_choice']) assert.equal(JSON.stringify(p).includes(prohibido), false, 'Opus 5.5 rechaza ' + prohibido)
+})
+
+test('copies IA: si un copy rompe una norma de Meta, se pide la corrección una sola vez y se entrega la versión mejorada', async () => {
+  const malos = [...limpios]; malos[1] = '¿Sufres de dolor en las articulaciones? 💪 Esto cura la artritis.'
+  const c = falso(tanda(malos), tanda(limpios))
+  const r = await pedirCopies({ client: c, modelo: 'claude-opus-5-5', contexto: ctxCopies })
+  assert.equal(r.llamadas, 2); assert.deepEqual(r.copies.map((x) => x.avisos.length), [0, 0, 0, 0, 0])
+  assert.match(c.pedidos[1].messages.at(-1).content, /Copy 2:/) // le dice cuál y por qué
+})
+
+test('copies IA: si tras la corrección sigue mal, se entrega MARCADO con avisos (no se oculta ni se reintenta sin fin)', async () => {
+  const malos = [...limpios]; malos[0] = 'Esto cura la artritis 💪'
+  const c = falso(tanda(malos), tanda(malos))
+  const r = await pedirCopies({ client: c, modelo: 'claude-opus-5-5', contexto: ctxCopies })
+  assert.equal(r.llamadas, 2); assert.ok(r.copies[0].avisos.length > 0)
+})
+
+test('copies IA: una respuesta ilegible se reintenta una vez; si sigue mal, avisa; un rechazo del modelo se reporta', async () => {
+  const c1 = falso(texto('no sé'), tanda(limpios))
+  assert.equal((await pedirCopies({ client: c1, modelo: 'claude-opus-5-5', contexto: ctxCopies })).copies.length, 5)
+  const c2 = falso(texto('no sé'), texto('tampoco'))
+  const r2 = await pedirCopies({ client: c2, modelo: 'claude-opus-5-5', contexto: ctxCopies })
+  assert.equal(r2.ilegible, true); assert.equal(r2.llamadas, 2)
+  const c3 = falso({ stop_reason: 'refusal', usage: uso, content: [] })
+  assert.equal((await pedirCopies({ client: c3, modelo: 'claude-opus-5-5', contexto: ctxCopies })).rechazada, true)
+})

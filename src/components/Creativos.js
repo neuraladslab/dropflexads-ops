@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Dialogo from '@/components/Dialogo'
 import { cop, fmtN, diaCorto } from '@/lib/formato'
 import Ayuda from '@/components/Ayuda'
+import CopiesCreativo from '@/components/CopiesCreativo'
 import { ESTADOS, FORMATOS, LECTURA, nombreCreativo, siguienteVersion } from '@/domain/creativos.ts'
 
 // Creativos: el nombre único (el mismo en esta app, en Meta y en Drive), el estado y una lectura de cuál funciona, cuál se está probando y cuál conviene refrescar.
@@ -27,7 +28,7 @@ function Copiar({ texto }) {
   return <button type="button" className="iconbtn" title="Copiar el nombre" aria-label={`Copiar el nombre ${texto}`} onClick={async () => { try { await navigator.clipboard.writeText(texto); setOk(true); setTimeout(() => setOk(false), 1500) } catch { /* sin portapapeles */ } }}>{ok ? '✓' : '⧉'}</button>
 }
 
-function Nuevo({ d, onCerrar, campanaFija }) {
+function Nuevo({ d, onCerrar, onCreado, campanaFija }) {
   const router = useRouter()
   const [campanaId, setCampanaId] = useState(campanaFija || d.campanas.find((c) => c.activa)?.id || d.campanas[0]?.id || '')
   const [angulo, setAngulo] = useState(''), [formato, setFormato] = useState('video'), [fecha, setFecha] = useState(d.hoy), [drive, setDrive] = useState(''), [gancho, setGancho] = useState('')
@@ -39,7 +40,7 @@ function Nuevo({ d, onCerrar, campanaFija }) {
   const sugeridos = d.angulosPorCampana[campanaId] || []
   async function crear(e) {
     e.preventDefault(); setError(''); setEnv(true)
-    try { await api('POST', '/api/creativos', { campanaId, angulo, formato, fecha, driveUrl: drive, gancho }); router.refresh(); onCerrar() } catch (ex) { setError(ex.message) } finally { setEnv(false) }
+    try { const r = await api('POST', '/api/creativos', { campanaId, angulo, formato, fecha, driveUrl: drive, gancho }); router.refresh(); onCreado({ id: r.id, nombre: r.nombre, angulo: angulo.trim(), formato }) } catch (ex) { setError(ex.message) } finally { setEnv(false) }
   }
   return (
     <Dialogo etiqueta="Nuevo creativo" onCerrar={onCerrar}>
@@ -65,7 +66,7 @@ function Nuevo({ d, onCerrar, campanaFija }) {
           </div>
         </details>
         {error && <span className="errm full" role="alert">{error}</span>}
-        <div className="fbar full"><button className="btn ghost" type="button" onClick={onCerrar}>Cancelar</button><button className="btn" type="submit" disabled={env || !nombre || !angulo.trim()}>Crear creativo</button></div>
+        <div className="fbar full"><button className="btn ghost" type="button" onClick={onCerrar}>Cancelar</button><button className="btn" type="submit" disabled={env || !nombre || !angulo.trim()}>Crear y generar copies</button></div>
       </form>
     </Dialogo>
   )
@@ -126,7 +127,7 @@ function Semaforo({ creativos, onAbrir }) {
 
 const ESTADO_SEL = (c, onEstado) => <select className="sel" aria-label={`Estado de ${c.nombre}`} value={c.estado} onChange={(ev) => onEstado(c, ev.target.value)}>{Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.nombre}</option>)}</select>
 
-function FilaCreativo({ c, onEstado, onEditar, conMetricas }) {
+function FilaCreativo({ c, onEstado, onEditar, onCopies, conMetricas }) {
   const l = c.lectura, e = ETIQUETA[l.etiqueta]
   return (
     <tr>
@@ -139,12 +140,12 @@ function FilaCreativo({ c, onEstado, onEditar, conMetricas }) {
       {l.gasto > 0
         ? <><td>{cop(l.gasto)}</td><td>{pct1(l.ctr)}</td><td>{l.cpc == null ? '—' : cop(l.cpc)}</td><td>{fmtN(l.compras)}</td></>
         : <td colSpan={conMetricas ? 4 : 1} className="muted" style={{ fontSize: 13 }}>Aún sin gasto en Meta</td>}
-      <td style={{ whiteSpace: 'nowrap' }}>{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Drive</a>} <button type="button" className="btn ghost" style={{ padding: '4px 10px' }} onClick={() => onEditar(c)}>Editar</button></td>
+      <td style={{ whiteSpace: 'nowrap' }}>{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Drive</a>} <button type="button" className="btn ghost" style={{ padding: '4px 10px' }} onClick={() => onCopies(c)} title="Copies de Meta Ads escritos por la IA">Copies{c.copies > 0 ? ` (${c.copies})` : ''}</button> <button type="button" className="btn ghost" style={{ padding: '4px 10px' }} onClick={() => onEditar(c)}>Editar</button></td>
     </tr>
   )
 }
 
-function TarjetaCreativo({ c, onEstado, onEditar }) {
+function TarjetaCreativo({ c, onEstado, onEditar, onCopies }) {
   const l = c.lectura, e = ETIQUETA[l.etiqueta]
   return (
     <article className="card cr-card">
@@ -166,7 +167,7 @@ function TarjetaCreativo({ c, onEstado, onEditar }) {
         </dl>
       ) : <div className="muted" style={{ fontSize: 13 }}>Aún sin gasto en Meta</div>}
       {(l.gasto > 0 || l.alertas.length > 0) && <details className="cr-por"><summary>Por qué esta lectura{l.alertas.length > 0 ? ' · ⚠ no cuadra con Meta' : ''}</summary><div style={{ fontSize: 13 }}>{l.motivos.join(' ')}{l.alertas.map((a) => <div key={a} style={{ color: 'var(--gold-ink)' }}>⚠ {a}</div>)}</div></details>}
-      <div className="cr-fila">{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Abrir en Drive</a>}<button type="button" className="btn ghost sm" onClick={() => onEditar(c)}>Editar</button></div>
+      <div className="cr-fila">{c.drive && <a className="link" href={c.drive} target="_blank" rel="noopener noreferrer">Abrir en Drive</a>}<button type="button" className="btn ghost sm" onClick={() => onCopies(c)}>Copies{c.copies > 0 ? ` (${c.copies})` : ''}</button><button type="button" className="btn ghost sm" onClick={() => onEditar(c)}>Editar</button></div>
     </article>
   )
 }
@@ -192,7 +193,7 @@ const alternar = (set, k) => set((s) => { const n = new Set(s); if (n.has(k)) n.
 
 export default function Creativos({ d, campanaFija = null }) {
   const router = useRouter()
-  const [nuevo, setNuevo] = useState(false), [editando, setEditando] = useState(null), [error, setError] = useState('')
+  const [nuevo, setNuevo] = useState(false), [editando, setEditando] = useState(null), [copies, setCopies] = useState(null), [error, setError] = useState('')
   const [fc, setFc] = useState(campanaFija || ''), [fe, setFe] = useState(''), [ff, setFf] = useState(''), [fl, setFl] = useState(''), [q, setQ] = useState('')
   const lista = useMemo(() => (d.creativos || []).filter((c) => (!fc || c.campanaId === fc) && (!fe || c.estado === fe) && (!ff || c.formato === ff) && (!fl || c.lectura.etiqueta === fl) && (!q || (c.nombre + ' ' + c.angulo + ' ' + (c.gancho || '')).toUpperCase().includes(q.trim().toUpperCase()))), [d.creativos, fc, fe, ff, fl, q])
   const grupos = useMemo(() => agrupar(lista, d.campanas || []), [lista, d.campanas])
@@ -273,9 +274,9 @@ export default function Creativos({ d, campanaFija = null }) {
                               <>
                                 <div className="cr-tabla scroll-x"><table className="tbl">
                                   <thead><tr><th>Creativo</th><th>Estado</th><th>Lectura<Ayuda texto={AYUDA_LECTURA} titulo="Lectura" /></th>{cj.items.some((c) => c.lectura.gasto > 0) ? <><th>Gasto (sin IVA)</th><th>CTR</th><th>Costo por clic</th><th>Compras</th></> : <th>Resultados</th>}<th></th></tr></thead>
-                                  <tbody>{cj.items.map((c) => <FilaCreativo key={c.id} c={c} conMetricas={cj.items.some((x) => x.lectura.gasto > 0)} onEstado={cambiarEstado} onEditar={setEditando} />)}</tbody></table></div>
+                                  <tbody>{cj.items.map((c) => <FilaCreativo key={c.id} c={c} conMetricas={cj.items.some((x) => x.lectura.gasto > 0)} onEstado={cambiarEstado} onEditar={setEditando} onCopies={(x) => setCopies({ creativo: x, auto: false })} />)}</tbody></table></div>
                                 {/* Celular: una tarjeta por creativo (la tabla no cabe) */}
-                                <div className="cr-lista cr-lista-g">{cj.items.map((c) => <TarjetaCreativo key={c.id} c={c} onEstado={cambiarEstado} onEditar={setEditando} />)}</div>
+                                <div className="cr-lista cr-lista-g">{cj.items.map((c) => <TarjetaCreativo key={c.id} c={c} onEstado={cambiarEstado} onEditar={setEditando} onCopies={(x) => setCopies({ creativo: x, auto: false })} />)}</div>
                               </>
                             )}
                           </div>
@@ -296,7 +297,8 @@ export default function Creativos({ d, campanaFija = null }) {
           <p className="muted" style={{ fontSize: 13.5 }}>Estos anuncios gastaron pero su nombre no coincide con ningún creativo. Crea el creativo con el mismo nombre del anuncio, renombra el anuncio en Meta, o enlázalo a mano desde «Editar».</p>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>{d.sinEnlazar.map((a) => <li key={a.id}><span style={{ fontFamily: 'ui-monospace, monospace' }}>{a.nombre || '(sin nombre)'}</span> · {cop(a.gasto)} · último gasto {diaCorto(a.ultimoDia)}</li>)}</ul></details>
       )}
-      {nuevo && <Nuevo d={d} campanaFija={campanaFija} onCerrar={() => setNuevo(false)} />}
+      {nuevo && <Nuevo d={d} campanaFija={campanaFija} onCerrar={() => setNuevo(false)} onCreado={(c) => { setNuevo(false); setCopies({ creativo: c, auto: true }) }} />}
+      {copies && <CopiesCreativo creativo={copies.creativo} autoGenerar={copies.auto} onCerrar={() => setCopies(null)} onCambio={() => router.refresh()} />}
       {editando && <Editar c={editando} sinEnlazar={d.sinEnlazar} onCerrar={() => setEditando(null)} />}
     </>
   )
