@@ -18,6 +18,12 @@ async function req(method, path, { cookie, headers = {}, body } = {}) {
   return { status: res.status, headers: res.headers, loc: res.headers.get('location') }
 }
 
+async function fetchJson(path, body, cookie) {
+  const res = await fetch(BASE + path, { method: 'POST', redirect: 'manual', headers: { Origin: BASE, 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body) })
+  const j = await res.json().catch(() => ({}))
+  return { status: res.status, code: j.code }
+}
+
 console.log(`\nVerificando ${BASE}\n`)
 try { await req('GET', '/login') } catch { console.error('No se pudo conectar. ¿Está corriendo la app? (npm run dev)'); process.exit(2) }
 
@@ -27,10 +33,18 @@ const walk = (dir, url) => { for (const e of readdirSync(dir)) { const p = join(
 walk('src/app/api', '/api')
 let open = []
 for (const { url, file } of routes) for (const m of [...readFileSync(file, 'utf8').matchAll(/export const (GET|POST|PUT|PATCH|DELETE)\b/g)].map((x) => x[1])) {
-  if (url === '/api/auth/login' || url === '/api/auth/login/2fa' || url === '/api/auth/logout') continue // públicas por diseño (el segundo paso exige un ticket firmado)
+  if (url === '/api/auth/login' || url === '/api/auth/login/2fa' || url === '/api/auth/logout' || url === '/api/auth/dispositivo') continue // públicas por diseño (el segundo paso exige un ticket firmado; el dispositivo recordado, un secreto en cookie httpOnly: se prueban abajo)
   const r = await req(m, url, { body: m === 'GET' || m === 'DELETE' ? undefined : {} }); if (r.status !== 401) open.push(`${m} ${url} → ${r.status}`)
 }
 check(`${routes.length} rutas protegidas`, open.length === 0, open.join(' | '))
+// Dispositivos recordados (ruta pública): sin el secreto de la cookie no se entra, ni con un id válido ni con un secreto inventado.
+const UUID0 = '00000000-0000-4000-8000-000000000000'
+{
+  const a = await fetchJson('/api/auth/dispositivo', { action: 'resume', id: UUID0 }), b = await fetchJson('/api/auth/dispositivo', { action: 'resume', id: UUID0 }, `dfa_dispositivo=${UUID0}.${'A'.repeat(43)}`), c = await fetchJson('/api/auth/dispositivo', { action: 'resume', id: "x'; DROP TABLE users;--" })
+  check('dispositivo recordado: sin cookie → 401', a.status === 401 && a.code === 'device', `${a.status}`)
+  check('dispositivo recordado: secreto inventado → 401', b.status === 401, `${b.status}`)
+  check('dispositivo recordado: id con inyección → 400', c.status === 400, `${c.status}`)
+}
 
 console.log('\n[2] Las páginas redirigen a /login sin sesión')
 for (const p of ['/', '/conciliacion', '/campanas', '/costos']) { const r = await req('GET', p); check(`GET ${p}`, [301, 302, 303, 307, 308].includes(r.status) && /\/login/.test(r.loc || '')) }

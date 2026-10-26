@@ -16,10 +16,10 @@ export const POST = guard(async (request, _ctx, session) => {
   const id = b && String(b.id == null ? '' : b.id).trim()
   if (!/^\d{1,12}$/.test(id)) return bad('El ID del producto son solo números (lo ves en la dirección del producto en Dropi).')
   const otp = typeof b.otp === 'string' ? b.otp.replace(/\s+/g, '') : ''
-  if (otp && !/^\d{6,8}$/.test(otp)) return bad('El código debe tener 6 dígitos.')
+  if (otp && !/^\d{6}$/.test(otp)) return bad('El código debe tener 6 dígitos.')
   try {
-    const p = await agregarProductoPorId(session.userId, id, { ip: clientIp(request), otp })
-    await logActivity(session.userId, `Agregaste el producto «${p.nombre}» (${p.id}) desde Dropi`)
+    const p = await agregarProductoPorId(session.ownerId, id, { ip: clientIp(request), otp })
+    await logActivity(session.ownerId, `Agregaste el producto «${p.nombre}» (${p.id}) desde Dropi`)
     return ok(p)
   } catch (e) {
     if (!(e instanceof DropiError)) throw e

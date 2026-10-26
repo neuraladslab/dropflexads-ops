@@ -8,7 +8,7 @@ const MAX_IDS = 500
 
 /** POST {action:'ignore', ids:[…], ignored:boolean} → marca (o desmarca) movimientos de la tarjeta para que no cuenten en la contabilidad. No borra nada y la sincronización no deshace la marca. */
 export const POST = guard(async (request, _ctx, session) => {
-  const uid = session.userId, b = await readBody(request)
+  const uid = session.ownerId, b = await readBody(request)
   if (!b || b.action !== 'ignore' || typeof b.ignored !== 'boolean') return bad('Acción no válida.')
   if (!Array.isArray(b.ids) || !b.ids.length || b.ids.length > MAX_IDS || !b.ids.every(isId)) return bad(`Indica entre 1 y ${MAX_IDS} movimientos.`)
   const ids = b.ids.map(Number)

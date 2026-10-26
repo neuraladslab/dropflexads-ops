@@ -3,6 +3,12 @@ import sql from '@/lib/db'
 import { sameOrigin, jsonBodyOk } from '@/lib/auth/csrf.mjs'
 import { getRequestSession } from '@/lib/auth/session'
 
+// El superadmin administra la plataforma (empresas y, más adelante, facturación): solo puede llamar a estas rutas, nunca a las de datos de una empresa.
+const RUTAS_SUPERADMIN = /^\/api\/(empresas|auth)(\/|$)/
+
+// Con una contraseña inicial sin cambiar solo se puede cambiarla (o cerrar sesión): nada más hasta entonces.
+const RUTAS_CAMBIO_CLAVE = /^\/api\/auth\/(password|logout|session|cuentas)$/
+
 export const ok = (data, status = 200) => Response.json(data, { status })
 export const bad = (message, status = 400, code) => Response.json(code ? { error: message, code } : { error: message }, { status })
 
@@ -62,6 +68,8 @@ export function guard(handler, { auth = true, passive = false } = {}) {
       if (auth) {
         session = await getRequestSession(request, { touch: !passive })
         if (!session) return noStore(bad('Tu sesión terminó. Inicia sesión de nuevo.', 401, 'auth'))
+        if (session.mustChange && !RUTAS_CAMBIO_CLAVE.test(new URL(request.url).pathname)) return noStore(bad('Primero debes cambiar tu contraseña.', 403, 'must_change'))
+        if (session.esSuperadmin && !RUTAS_SUPERADMIN.test(new URL(request.url).pathname)) return noStore(bad('El superadmin no tiene acceso a los datos de las empresas.', 403))
       }
       return noStore(await handler(request, ctx, session))
     } catch (error) {

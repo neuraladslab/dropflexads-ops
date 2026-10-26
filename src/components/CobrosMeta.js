@@ -7,7 +7,8 @@ import { Icono } from '@/components/shell/Icono'
 import { TablaCobrosMeta } from '@/components/datos/TablasDatos'
 const todayCO = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10) // hoy en Bogotá
 
-// Cobros de Meta: Meta ya no los entrega por la API, así que se anotan a mano (con su referencia de pago) o se importan desde el JSON de la calculadora.
+// Cobros de Meta: la API de Marketing ya no los entrega (Meta quitó el campo «transactions»), así que se anotan a mano o se importan desde el JSON de la calculadora.
+// A cada cobro se le pone su referencia de pago («FACEBK *PZ4XV8SWF4» → PZ4XV8SWF4) para cruzarlo con el movimiento exacto de la tarjeta de Dropi.
 async function llamar(body) {
   const res = await fetch('/api/meta-cobros', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
   const data = await res.json().catch(() => ({}))
@@ -45,10 +46,33 @@ function Anotar({ onCerrar, onListo }) {
   )
 }
 
+/** Pone o cambia la referencia de pago de un cobro (la llave del cruce con la tarjeta de Dropi). */
+function Referencia({ cobro, onCerrar, onListo }) {
+  const [ref, setRef] = useState(cobro.ref || '')
+  const [error, setError] = useState(''), [ocupado, setOcupado] = useState(false)
+  // Acepta lo copiado del extracto («FACEBK *PZ4XV8SWF4»): se queda con lo que va después del asterisco y solo letras y números.
+  const limpiar = (v) => v.toUpperCase().replace(/^.*\*/, '').replace(/[^A-Z0-9]/g, '').slice(0, 24)
+  async function guardar(e) {
+    e.preventDefault(); setOcupado(true); setError('')
+    try { await llamar({ action: 'set_ref', id: cobro.id, paymentRef: ref }); onListo(ref ? 'Referencia guardada.' : 'Referencia quitada.') } catch (er) { setError(er.message); setOcupado(false) }
+  }
+  return (
+    <Dialogo etiqueta="Referencia de pago" onCerrar={onCerrar}>
+      <form onSubmit={guardar}>
+        <h2 style={{ marginTop: 0 }}>Referencia de pago</h2>
+        <p className="muted" style={{ marginTop: 0 }}>Cobro del {cobro.fecha} por ${Math.round(cobro.monto).toLocaleString('es-CO')}. Cópiala del extracto de tu tarjeta de Dropi, donde aparece como «FACEBK *PZ4XV8SWF4»: así este cobro se cruza con el movimiento exacto de la tarjeta.</p>
+        <div className="field"><label htmlFor="cr-ref">Referencia</label><div className="inp"><input id="cr-ref" type="text" autoFocus autoComplete="off" spellCheck={false} placeholder="PZ4XV8SWF4" maxLength={24} value={ref} onChange={(e) => setRef(limpiar(e.target.value))} /></div><span className="hint">6 a 24 letras y números. Si la dejas vacía se cruza por monto y fecha.</span></div>
+        {error && <div className="tint bad" role="alert" style={{ marginTop: 12 }}><b style={{ color: 'var(--coral-ink)' }}>{error}</b></div>}
+        <div className="fbar" style={{ marginTop: 16 }}><button type="button" className="btn ghost" onClick={onCerrar}>Cancelar</button><button className="btn" disabled={ocupado || (ref !== '' && ref.length < 6)}>{ocupado ? 'Guardando…' : 'Guardar'}</button></div>
+      </form>
+    </Dialogo>
+  )
+}
+
 export default function CobrosMeta({ cobros }) {
   const router = useRouter(), archivo = useRef(null)
-  const [dialogo, setDialogo] = useState(false), [aviso, setAviso] = useState(null), [ocupado, setOcupado] = useState(false)
-  const listo = (m) => { setDialogo(false); setAviso({ ok: true, m }); router.refresh() }
+  const [dialogo, setDialogo] = useState(false), [editando, setEditando] = useState(null), [aviso, setAviso] = useState(null), [ocupado, setOcupado] = useState(false)
+  const listo = (m) => { setDialogo(false); setEditando(null); setAviso({ ok: true, m }); router.refresh() }
 
   async function importar(e) {
     const file = e.target.files && e.target.files[0]; e.target.value = ''
@@ -74,8 +98,9 @@ export default function CobrosMeta({ cobros }) {
         <input ref={archivo} type="file" accept="application/json,.json" hidden onChange={importar} />
       </div>
       {aviso && <div className={'tint ' + (aviso.ok ? 'ok' : 'bad')} role={aviso.ok ? 'status' : 'alert'} style={{ marginBottom: 10 }}><b style={{ color: aviso.ok ? 'var(--jade-ink)' : 'var(--coral-ink)' }}>{aviso.m}</b></div>}
-      <TablaCobrosMeta cobros={cobros} onQuitar={quitar} />
+      <TablaCobrosMeta cobros={cobros} onQuitar={quitar} onReferencia={setEditando} />
       {dialogo && <Anotar onCerrar={() => setDialogo(false)} onListo={listo} />}
+      {editando && <Referencia cobro={editando} onCerrar={() => setEditando(null)} onListo={listo} />}
     </>
   )
 }

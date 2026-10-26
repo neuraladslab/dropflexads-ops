@@ -8,23 +8,23 @@ import { ITEMS } from './nav'
 /** Destinos de la paleta: cada sección y cada una de sus pestañas. */
 const DESTINOS = ITEMS.flatMap((i) => (i.tabs
   ? i.tabs.map((t) => ({ href: t.slug ? `${i.href}/${t.slug}` : i.href, titulo: t.titulo, seccion: i.titulo, icono: i.icono }))
-  : [{ href: i.href, titulo: i.titulo, seccion: i.desc, icono: i.icono }]))
+  : [{ href: i.href, titulo: i.titulo, seccion: i.desc, icono: i.icono, soloSuper: !!i.soloSuper, todos: !!i.todos }]))
 
 const sinTildes = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
-export default function Paleta({ abierta, onCerrar }) {
-  return abierta ? <PaletaAbierta onCerrar={onCerrar} /> : null // al abrir se monta de nuevo: búsqueda y selección parten de cero
+export default function Paleta({ abierta, onCerrar, esSuperadmin }) {
+  return abierta ? <PaletaAbierta onCerrar={onCerrar} esSuperadmin={esSuperadmin} /> : null // al abrir se monta de nuevo: búsqueda y selección parten de cero
 }
 
-function PaletaAbierta({ onCerrar }) {
+function PaletaAbierta({ onCerrar, esSuperadmin }) {
   const router = useRouter()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
   const input = useRef(null)
   const lista = useMemo(() => {
     const k = sinTildes(q.trim())
-    return DESTINOS.filter((d) => !k || sinTildes(d.titulo + ' ' + d.seccion).includes(k))
-  }, [q])
+    return DESTINOS.filter((d) => (d.todos || !!d.soloSuper === !!esSuperadmin) && (!k || sinTildes(d.titulo + ' ' + d.seccion).includes(k)))
+  }, [q, esSuperadmin])
 
   useEffect(() => { input.current && input.current.focus() }, [])
   const listaRef = useRef(null)

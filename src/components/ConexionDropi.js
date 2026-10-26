@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Icono } from '@/components/shell/Icono'
+import CodigoOtp from '@/components/CodigoOtp'
 import Dialogo from '@/components/Dialogo'
-import { diaCorto, hace, cop } from '@/lib/formato'
+import { hace } from '@/lib/formato'
 
 // Mismo diseño que el panel de Dropi de la app original: tarjeta horizontal a todo el ancho (estado a la izquierda, botones a la derecha),
 // versión compacta minimizable y diálogos para conectar y desconectar.
 const espera = (s) => (s >= 3600 ? Math.ceil(s / 3600) + ' h' : Math.max(1, Math.ceil(s / 60)) + ' min')
-const hoyISO = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10)
 
 async function llamar(method, body) {
   const res = await fetch('/api/dropi', { method, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
@@ -40,7 +40,7 @@ function DialogoConectar({ onCerrar, onListo }) {
     e.preventDefault()
     if (!v.appPassword) { setError('Escribe tu contraseña de esta app.'); return }
     const auto = v.modo === 'auto'
-    if (!v.email || !v.password || !v.cardId || (auto ? !v.totp : !v.otp)) {
+    if (!v.email || !v.password || !v.cardId || (auto ? !v.totp : v.otp.length !== 6)) {
       setError(auto ? 'Completa el correo, la contraseña, la clave del autenticador y el ID de la tarjeta.' : 'Completa el correo, la contraseña, el ID de la tarjeta y el código de 6 dígitos de tu autenticador de Dropi.')
       return
     }
@@ -76,7 +76,7 @@ function DialogoConectar({ onCerrar, onListo }) {
             </label>
           </fieldset>
           {v.modo === 'otp'
-            ? <Campo id="dr-otpnow" etiqueta="Código de tu autenticador de Dropi (el de ahora)" ayuda="Se usa una sola vez para comprobar la conexión y no se guarda." inputMode="numeric" autoComplete="one-time-code" maxLength={8} placeholder="123456" value={v.otp} onChange={set('otp')} />
+            ? <div className="field"><label htmlFor="dr-otpnow">Código de tu autenticador de Dropi (el de ahora)</label><CodigoOtp id="dr-otpnow" etiqueta="Código de tu autenticador de Dropi" value={v.otp} onChange={(otp) => setV((p) => ({ ...p, otp }))} /><span className="muted" style={{ fontSize: 13, marginTop: 6, display: 'block' }}>6 dígitos. Se usa una sola vez para comprobar la conexión y no se guarda. Cambia cada 30 segundos: escríbelo y conecta enseguida.</span></div>
             : <Campo id="dr-totp" etiqueta="Clave del autenticador de Dropi" ayuda="La clave de texto que Dropi muestra junto al código QR al activar el autenticador («¿no puedes escanear el código?»)." type="password" autoComplete="off" maxLength={600} placeholder="Clave de texto (A–Z, 2–7) o enlace otpauth://" value={v.totp} onChange={set('totp')} />}
           <Campo id="dr-card" etiqueta="ID de la tarjeta" ayuda="Aparece en la dirección de la API de movimientos de tu tarjeta: …/list-card-transactions/car_…/1/20" autoComplete="off" maxLength={60} placeholder="car_…" value={v.cardId} onChange={set('cardId')} />
           <hr style={{ border: 0, borderTop: '1px solid var(--line2)', width: '100%' }} />
@@ -93,63 +93,17 @@ function DialogoConectar({ onCerrar, onListo }) {
   )
 }
 
-function Resultado({ r }) {
-  if (!r) return null
-  if (r.error && !r.ok) return <div className="tint bad" role="alert" style={{ marginBottom: 16 }}><b style={{ color: 'var(--coral-ink)' }}>{r.error.message || r.error}</b></div>
-  const estados = r.orders && r.orders.estados ? Object.entries(r.orders.estados).sort((a, b) => b[1] - a[1]) : []
-  const fallos = [['Saldo de la tarjeta', r.balance], ['Billetera', r.wallet], ['Pedidos', r.orders]].filter(([, x]) => x && x.ok === false && x.error)
-  return (
-    <div style={{ marginBottom: 16 }}>
-      {fallos.length > 0 && <div className="tint bad" role="alert" style={{ marginBottom: 10 }}><b style={{ color: 'var(--coral-ink)' }}>Algo no se pudo leer de Dropi</b>{fallos.map(([n, x]) => <div key={n} style={{ fontSize: 14.5, marginTop: 4 }}><b>{n}:</b> {x.error.message}</div>)}<div className="muted" style={{ fontSize: 13, marginTop: 6 }}>Lo que sí se leyó quedó guardado. Si el mensaje trae un código HTTP, mándamelo y lo ajusto.</div></div>}
-      {r.replaced === false && <div className="tint warn" style={{ marginBottom: 10 }}><b style={{ color: 'var(--gold-ink)' }}>No se borró nada: </b>{r.incomplete ? 'Dropi dejó páginas sin leer. Intenta de nuevo.' : 'Dropi no devolvió movimientos.'}</div>}
-      <div className="kpis">
-        <div className="card"><div className="kpi-l">Tarjeta</div><div className="kpi-v">{r.inserted ?? 0}</div><div className="muted" style={{ fontSize: 13 }}>movimientos nuevos{r.updated ? ` · ${r.updated} actualizados` : ''}{r.window ? ` (${r.window.from} a ${r.window.to})` : ''}</div></div>
-        <div className="card"><div className="kpi-l">Saldo de la tarjeta</div><div className="kpi-v">{r.balance && r.balance.ok ? cop(r.balance.amount) : '—'}</div><div className="muted" style={{ fontSize: 13 }}>según Dropi</div></div>
-        <div className="card"><div className="kpi-l">Billetera</div><div className="kpi-v">{r.wallet && r.wallet.ok !== false ? (r.wallet.inserted ?? 0) : '—'}</div><div className="muted" style={{ fontSize: 13 }}>movimientos nuevos</div></div>
-        <div className="card"><div className="kpi-l">Pedidos</div><div className="kpi-v">{r.orders && r.orders.ok ? r.orders.read : '—'}</div><div className="muted" style={{ fontSize: 13 }}>{r.orders && r.orders.ok ? `${r.orders.inserted} nuevos · ${r.orders.updated} actualizados${r.orders.omitidos ? ` · ${r.orders.omitidos} omitidos (${r.orders.canceladas ? `${r.orders.canceladas} cancelados` : 'anteriores al inicio'})` : ''}` : r.orders && r.orders.error ? r.orders.error.message : ''}</div></div>
-      </div>
-      {estados.length > 0 && (
-        <div className="card" style={{ marginTop: 14 }}>
-          <b>Pedidos por estado en Dropi</b>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>{estados.map(([e, n]) => <span key={e} className="chip idle">{e} · {n}</span>)}</div>
-          <p className="muted only-learner" style={{ fontSize: 13, margin: '10px 0 0' }}>Así llegan los estados de Dropi. Los agrupo en entregado, devolución, novedad, en tránsito y pendiente; si ves uno que no encaja, avísame.</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function ConexionDropi() {
   const router = useRouter()
   const [d, setD] = useState(null)
   const [errorCarga, setErrorCarga] = useState('')
   const [conectar, setConectar] = useState(false)
-  const [trabajando, setTrabajando] = useState('')
-  const [otp, setOtp] = useState('')
-  const [desde, setDesde] = useState('') // fecha elegida (vacía = la guardada)
-  const [resultado, setResultado] = useState(null)
 
   const cargar = useCallback(async () => {
     try { setD(await llamar('GET')); setErrorCarga('') } catch (e) { setErrorCarga(e.message) }
   }, [])
   // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial desde la API
   useEffect(() => { cargar() }, [cargar])
-
-  // «Sincronizar desde»: trae tarjeta, billetera y pedidos desde esa fecha. Una fecha anterior al inicio amplía la operación; una posterior solo limita lo que se lee. Nunca borra días anteriores ni duplica lo que ya está.
-  async function sincronizar(e) {
-    e.preventDefault()
-    const fecha = desde || d.opFrom
-    if (d.needsOtp && !/^\d{6,8}$/.test(otp)) { setResultado({ error: { message: 'Escribe el código de 6 dígitos de tu autenticador de Dropi para iniciar sesión.' } }); return }
-    setResultado(null)
-    setTrabajando(`Sincronizando desde el ${diaCorto(fecha)}… (se hace despacio, a propósito)`)
-    try {
-      // Una fecha ANTERIOR al inicio amplía la operación hacia atrás. Una fecha POSTERIOR solo limita lo que se vuelve a leer: el inicio y los días anteriores se conservan.
-      if (fecha < d.opFrom) await llamar('POST', { action: 'set_start', from: fecha })
-      const soloDesde = fecha > d.opFrom
-      setResultado(await llamar('POST', { action: 'sync', ...(soloDesde ? { from: fecha, to: hoyISO() } : { historico: true }), ...(otp ? { otp } : {}) }))
-    } catch (ex) { setResultado({ error: { message: ex.message } }) }
-    finally { setOtp(''); setDesde(''); setTrabajando(''); cargar(); router.refresh() } // las listas de abajo se leen en el servidor
-  }
 
   const caja = (hijos) => <div className="card" style={{ marginBottom: 16, display: 'flex', gap: '14px 24px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>{hijos}</div>
 
@@ -163,11 +117,10 @@ export default function ConexionDropi() {
     </>)
   } else {
     const hay = d.cooldownSeconds > 0
-    const puede = d.state !== 'reauth' && !hay && !d.syncing && !trabajando
     const st = d.state === 'reauth' ? <Chip tono="bad">Credenciales rechazadas</Chip>
       : d.state === 'blocked' ? <Chip tono="warn">Dropi nos pausó · espera {espera(d.cooldownSeconds)}</Chip>
       : hay ? <Chip tono="warn">En pausa · {espera(d.cooldownSeconds)}</Chip>
-      : d.syncing || trabajando ? <Chip tono="blue">Sincronizando…</Chip>
+      : d.syncing ? <Chip tono="blue">Sincronizando…</Chip>
       : d.needsOtp ? <Chip tono="blue">Escribe tu código para entrar</Chip>
       : <Chip tono="ok">Conectado</Chip>
     panel = caja(<>
@@ -175,21 +128,14 @@ export default function ConexionDropi() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><b>Dropi</b>{st}</div>
         <div className="muted" style={{ fontSize: 13.5, marginTop: 4 }}>Tarjeta {d.cardHint} · última sincronización {hace(d.lastSyncOkAt)}</div>
         {d.lastError && d.state !== 'ok' && <div style={{ fontSize: 13.5, color: 'var(--coral-ink)', marginTop: 2 }}>{d.lastError}</div>}
-        {trabajando && <div className="muted" style={{ fontSize: 13.5, marginTop: 4 }} aria-live="polite">{trabajando}</div>}
       </div>
-      <form onSubmit={sincronizar} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        {d.needsOtp && puede && <div className="inp" style={{ maxWidth: 190 }}><input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8} placeholder="Código de Dropi" aria-label="Código de 6 dígitos de tu autenticador de Dropi" value={otp} onChange={(e) => setOtp(e.target.value)} /></div>}
-        <label htmlFor="op-from" style={{ fontSize: 14, fontWeight: 600 }}>Sincronizar desde</label>
-        <div className="inp" style={{ padding: '0 10px' }}><input id="op-from" type="date" min="2020-01-01" max={hoyISO()} required value={desde || d.opFrom || ''} onChange={(e) => setDesde(e.target.value)} style={{ fontSize: 15, padding: '8px 0' }} /></div>
-        <button className="btn sm" type="submit" disabled={!puede}>{trabajando ? 'Sincronizando…' : 'Sincronizar'}</button>
-      </form>
+      <span className="muted" style={{ fontSize: 13.5, maxWidth: 260 }}>Para traer datos usa <b>Sincronizar</b>, en la barra de arriba.</span>
     </>)
   }
 
   return (
     <>
       {panel}
-      <Resultado r={resultado} />
       {conectar && <DialogoConectar onCerrar={() => setConectar(false)} onListo={() => { setConectar(false); cargar(); router.refresh() }} />}
     </>
   )

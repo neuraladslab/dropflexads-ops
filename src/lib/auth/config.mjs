@@ -14,6 +14,14 @@ export const JWT_AUDIENCE = 'dropflexads-web'
 export const JWT_ALG = 'HS256'
 
 export const MAX_ACTIVE_SESSIONS = 5
+// Varias cuentas abiertas en el mismo navegador: la activa va en COOKIE_NAME y las demás (hasta MAX_ACCOUNTS en total) en esta otra cookie httpOnly.
+export const OTHERS_COOKIE_NAME = IS_PROD ? '__Host-dfa_cuentas' : 'dfa_cuentas'
+export const MAX_ACCOUNTS = 5
+// Dispositivos recordados: entrar sin contraseña desde un equipo personal. Vigencia deslizante (cada uso la renueva) con tope absoluto; el superadmin, más corta.
+export const DEVICE_COOKIE_NAME = IS_PROD ? '__Host-dfa_dispositivo' : 'dfa_dispositivo'
+export const DEVICE_TTL_DAYS = { member: 30, superadmin: 7 }
+export const DEVICE_MAX_DAYS = 90
+export const DEVICE_MAX_PER_USER = 5
 
 // Segundo paso del inicio de sesión: tras acertar la contraseña se entrega un «ticket» de vida corta (NO es una sesión: otra audiencia).
 export const MFA_AUDIENCE = 'dropflexads-mfa'

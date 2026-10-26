@@ -4,6 +4,7 @@ import sql from '@/lib/db'
 import { logActivity } from '@/lib/activity'
 import { inicioOperacion } from '@/lib/inicio'
 import { diaBogota, hoyBogota } from '@/domain/fechas.ts'
+import { pisoSync } from '@/domain/ventana.ts'
 import { MetaError, metaGetAll } from './client'
 import { tokenDe } from './conexion'
 import { vincularCampanasMeta } from './vincular'
@@ -27,12 +28,13 @@ async function guardarGastoAnuncios(uid, filas) {
   }
 }
 
-/** → { ok, window, gasto?, cobros?, error? }. Nunca lanza por errores de Meta: los devuelve. `from`/`to` piden un rango exacto. */
+/** → { ok, window, gasto?, error? }. Nunca lanza por errores de Meta: los devuelve. `from`/`to` piden un rango exacto. */
 export async function sincronizarMeta(uid, { from = null, to = null } = {}) {
   const claim = await sql`UPDATE meta_connections SET sync_started_at = NOW() WHERE owner_id = ${uid} AND (sync_started_at IS NULL OR sync_started_at < NOW() - interval '2 minutes') RETURNING ad_account_id, last_sync_ok_at`
   if (!claim.length) return { ok: false, error: { code: 'busy', message: 'Meta no está conectado o ya se está sincronizando. Espera un momento.' } }
   const hoy = hoyBogota(), inicio = await inicioOperacion(uid)
-  const win = from ? { from, to: to || hoy } : ventanaMeta({ hoy, inicio, ultimaSyncDia: claim[0].last_sync_ok_at ? diaBogota(claim[0].last_sync_ok_at) : null })
+  const piso = pisoSync(inicio, hoy) // nunca antes del inicio de la operación ni de los 3 meses permitidos
+  const win = from ? { from: from < piso ? piso : from, to: to || hoy } : ventanaMeta({ hoy, inicio: piso, ultimaSyncDia: claim[0].last_sync_ok_at ? diaBogota(claim[0].last_sync_ok_at) : null })
   let res
   try {
     const t = await tokenDe(uid)

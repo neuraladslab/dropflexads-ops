@@ -7,9 +7,9 @@ import { cuentaMeta } from '@/lib/meta/rutas.mjs'
 import { MetaError } from '@/lib/meta/client'
 import { conectarMeta, desconectarMeta, guardarIva, leerConexion } from '@/lib/meta/conexion'
 import { sincronizarMeta } from '@/lib/meta/sync'
-import { validarRango } from '@/domain/ventana.ts'
+import { validarRangoOperacion } from '@/domain/ventana.ts'
 import { todayCO } from '@/lib/util'
-import { inicioOperacion } from '@/lib/inicio'
+import { inicioConfigurado, inicioOperacion, SIN_INICIO, ventanaSync } from '@/lib/inicio'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -19,10 +19,10 @@ const ms = (c) => (c ? { ...c, lastSyncAt: c.last_sync_at ? new Date(c.last_sync
 
 /** Estado de la conexión con Meta. NUNCA devuelve el token: solo sus últimos 4 caracteres. */
 export const GET = guard(async (_req, _ctx, session) => {
-  const c = await leerConexion(session.userId)
-  const opFrom = await inicioOperacion(session.userId)
-  if (!c) return ok({ connected: false, opFrom })
-  return ok({ connected: true, opFrom, adAccountId: c.ad_account_id, accountName: c.account_name, currency: c.currency, tokenHint: c.token_hint, vatPct: c.vat, state: c.state, lastError: c.last_error, syncing: c.syncing, lastSyncAt: ms(c).lastSyncAt, lastSyncOkAt: ms(c).lastSyncOkAt })
+  const c = await leerConexion(session.ownerId)
+  const ventana = await ventanaSync(session.ownerId), opFrom = ventana.inicio // una sola lectura del ajuste
+  if (!c) return ok({ connected: false, opFrom, ...ventana })
+  return ok({ connected: true, opFrom, ...ventana, adAccountId: c.ad_account_id, accountName: c.account_name, currency: c.currency, tokenHint: c.token_hint, vatPct: c.vat, state: c.state, lastError: c.last_error, syncing: c.syncing, lastSyncAt: ms(c).lastSyncAt, lastSyncOkAt: ms(c).lastSyncOkAt })
 })
 
 /**
@@ -33,7 +33,7 @@ export const GET = guard(async (_req, _ctx, session) => {
  *  · sync {from?, to?}                                             → trae gasto y cobros desde el inicio de la operación (o el rango pedido).
  */
 export const POST = guard(async (request, _ctx, session) => {
-  const uid = session.userId
+  const uid = session.ownerId
   const b = (await readBody(request)) || {}
   const action = b.action
   if (!['connect', 'disconnect', 'set_vat', 'sync'].includes(action)) return bad('Acción no válida.')
@@ -46,12 +46,13 @@ export const POST = guard(async (request, _ctx, session) => {
   }
 
   if (action === 'sync') {
+    if (!(await inicioConfigurado(uid))) return bad(SIN_INICIO, 409, 'sin_inicio')
     const key = throttleKey('metasync', String(uid))
     const wait = await lockedSeconds([key])
     if (wait > 0) return bad(`Demasiadas sincronizaciones. Espera ${Math.ceil(wait / 60)} min.`, 429, 'locked')
     await recordFailure(key, 20, { windowSeconds: 3600, lockSeconds: 3600 })
     let from = null, to = null
-    if (b.from) { const e = validarRango(b.from, b.to, todayCO()); if (e) return bad(e); from = b.from; to = b.to || b.from }
+    if (b.from) { const e = validarRangoOperacion(b.from, b.to, todayCO(), await inicioOperacion(uid)); if (e) return bad(e); from = b.from; to = b.to || b.from }
     return ok(await sincronizarMeta(uid, { from, to }))
   }
 
@@ -65,18 +66,18 @@ export const POST = guard(async (request, _ctx, session) => {
     if (iva == null) return bad('El IVA debe ser un número entre 0 y 30.')
     datos = { cuenta, token, vatPct: iva }
   }
-  const id = await confirmIdentity(uid, b)
+  const id = await confirmIdentity(session.userId, b)
   if (id) return bad(id.error, id.status)
 
   if (action === 'disconnect') {
     const r = await desconectarMeta(uid)
-    if (r.length) { await logAuthEvent(request, 'meta_disconnect', uid); await logActivity(uid, 'Desconectaste tu cuenta de Meta') }
+    if (r.length) { await logAuthEvent(request, 'meta_disconnect', session.userId); await logActivity(uid, 'Desconectaste tu cuenta de Meta') }
     return ok({ connected: false })
   }
 
   try {
     const info = await conectarMeta(uid, datos)
-    await logAuthEvent(request, 'meta_connect', uid)
+    await logAuthEvent(request, 'meta_connect', session.userId)
     await logActivity(uid, `Conectaste la cuenta de Meta ${datos.cuenta}`)
     return ok({ connected: true, accountName: info.nombre, currency: info.moneda }, 201)
   } catch (e) {

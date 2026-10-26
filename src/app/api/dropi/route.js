@@ -8,9 +8,8 @@ import { CARD_ID_RE } from '@/lib/dropi/config.mjs'
 import { DropiError } from '@/lib/dropi/client'
 import { connectDropi } from '@/lib/dropi/session'
 import { sincronizarTodo } from '@/lib/dropi/sync-all'
-import { validarRango, validarInicio } from '@/domain/ventana.ts'
-import { getSetting, setSetting } from '@/lib/settings'
-import { OPERACION_INICIO } from '@/lib/dropi/config.mjs'
+import { validarRangoOperacion } from '@/domain/ventana.ts'
+import { inicioConfigurado, inicioOperacion, SIN_INICIO, ventanaSync } from '@/lib/inicio'
 import { todayCO } from '@/lib/util'
 
 export const runtime = 'nodejs'
@@ -18,7 +17,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const HTTP = { reauth: 409, need_otp: 428, otp_rejected: 422, cooldown: 429, blocked: 429, busy: 429, no_connection: 409, network: 502, unexpected: 502 }
-const OTP_RE = /^\d{6,8}$/
+const OTP_RE = /^\d{6}$/
 const fail = (e) => {
   const res = Response.json({ error: e.message, code: e.code, seconds: e.seconds || 0 }, { status: HTTP[e.code] || 502 })
   if (e.seconds) res.headers.set('Retry-After', String(Math.ceil(e.seconds)))
@@ -27,13 +26,13 @@ const fail = (e) => {
 
 /** Estado de la conexión. NUNCA devuelve credenciales, token ni el ID completo de la tarjeta: solo pistas enmascaradas. */
 export const GET = guard(async (_request, _ctx, session) => {
-  const opFrom = (await getSetting(session.userId, 'op_from')) || OPERACION_INICIO
+  const ventana = await ventanaSync(session.ownerId), opFrom = ventana.inicio // una sola lectura del ajuste
   const [c] = await sql`SELECT email_hint, card_hint, state, (totp_enc IS NULL) AS manual_otp, cooldown_until, last_sync_at, last_sync_ok_at, next_page, last_error, sync_started_at,
-                               (token_exp IS NOT NULL AND token_exp > NOW()) AS session_ok FROM dropi_connections WHERE owner_id = ${session.userId}`
-  if (!c) return ok({ connected: false, opFrom })
+                               (token_exp IS NOT NULL AND token_exp > NOW()) AS session_ok FROM dropi_connections WHERE owner_id = ${session.ownerId}`
+  if (!c) return ok({ connected: false, opFrom, ...ventana })
   const left = c.cooldown_until ? Math.max(0, Math.ceil((new Date(c.cooldown_until).getTime() - Date.now()) / 1000)) : 0
   return ok({
-    opFrom, connected: true, emailHint: c.email_hint, cardHint: c.card_hint, state: c.state, cooldownSeconds: left,
+    opFrom, ...ventana, connected: true, emailHint: c.email_hint, cardHint: c.card_hint, state: c.state, cooldownSeconds: left,
     lastSyncAt: c.last_sync_at ? new Date(c.last_sync_at).getTime() : null, lastSyncOkAt: c.last_sync_ok_at ? new Date(c.last_sync_ok_at).getTime() : null,
     lastError: c.last_error || null, sessionActive: !!c.session_ok,
     // «otp»: no se guarda la clave del autenticador y, sin sesión activa, la persona escribe el código al sincronizar; «auto»: se genera solo.
@@ -51,21 +50,13 @@ export const GET = guard(async (_request, _ctx, session) => {
  *  · disconnect {appPassword, appCode?}                             → borra las credenciales y el token.
  */
 export const POST = guard(async (request, _ctx, session) => {
-  const uid = session.userId
+  const uid = session.ownerId
   const b = await readBody(request)
   const action = b?.action
-  if (!['connect', 'sync', 'reset_card', 'disconnect', 'set_start'].includes(action)) return bad('Acción no válida.')
-
-  // Fecha desde la que se traen los datos de Dropi (tarjeta y billetera). Solo cambia el ajuste: no borra nada ni llama a Dropi.
-  if (action === 'set_start') {
-    const err = validarInicio(b.from, todayCO())
-    if (err) return bad(err)
-    await setSetting(uid, 'op_from', b.from)
-    await logActivity(uid, `Cambiaste la fecha desde la que se sincroniza Dropi: ${b.from}`)
-    return ok({ opFrom: b.from })
-  }
+  if (!['connect', 'sync', 'reset_card', 'disconnect'].includes(action)) return bad('Acción no válida.')
 
   if (action === 'sync' || action === 'reset_card') {
+    if (!(await inicioConfigurado(uid))) return bad(SIN_INICIO, 409, 'sin_inicio')
     // Tope por hora además del intervalo mínimo de la propia sincronización.
     const key = throttleKey('dropisync', String(uid))
     const wait = await lockedSeconds([key])
@@ -76,12 +67,12 @@ export const POST = guard(async (request, _ctx, session) => {
     const ip = clientIp(request)
     let modo = action === 'reset_card' ? 'reset' : b.historico === true ? 'historico' : 'incremental', from = null, to = null
     if (action === 'sync' && b.from) { // sincronizar un día o entre fechas
-      const err = validarRango(b.from, b.to, todayCO())
+      const err = validarRangoOperacion(b.from, b.to, todayCO(), await inicioOperacion(uid))
       if (err) return bad(err)
       modo = 'rango'; from = b.from; to = b.to || b.from
     }
     const r = await sincronizarTodo(uid, { ip, otp, modo, from, to })
-    if (action === 'reset_card' && r.ok) await logActivity(uid, r.replaced ? `Reiniciaste la tarjeta: se borró lo guardado y se cargaron ${r.inserted} movimientos desde ${r.window.from}` : 'Intentaste reiniciar la tarjeta pero Dropi no devolvió movimientos: no se borró nada')
+    if (action === 'reset_card' && r.ok) await logActivity(uid, r.replaced ? `Reiniciaste la tarjeta del ${r.window.from} al ${r.window.to} (lo anterior se conservó): ${r.inserted} movimientos` : 'Intentaste reiniciar la tarjeta pero Dropi no devolvió movimientos: no se borró nada')
     return ok(r)
   }
 
@@ -103,12 +94,12 @@ export const POST = guard(async (request, _ctx, session) => {
     creds = { email, password, totp, otp, cardId }
   }
 
-  const id = await confirmIdentity(uid, b)
+  const id = await confirmIdentity(session.userId, b)
   if (id) return bad(id.error, id.status)
 
   if (action === 'disconnect') {
     const rows = await sql`DELETE FROM dropi_connections WHERE owner_id = ${uid} RETURNING owner_id`
-    if (rows.length) { await logAuthEvent(request, 'dropi_disconnect', uid); await logActivity(uid, 'Desconectaste tu cuenta de Dropi') }
+    if (rows.length) { await logAuthEvent(request, 'dropi_disconnect', session.userId); await logActivity(uid, 'Desconectaste tu cuenta de Dropi') }
     return ok({ connected: false })
   }
 
@@ -119,7 +110,7 @@ export const POST = guard(async (request, _ctx, session) => {
     if (e instanceof DropiError) return fail(e)
     throw e
   }
-  await logAuthEvent(request, 'dropi_connect', uid)
+  await logAuthEvent(request, 'dropi_connect', session.userId)
   await logActivity(uid, 'Conectaste tu cuenta de Dropi')
   return ok({ connected: true }, 201)
 })

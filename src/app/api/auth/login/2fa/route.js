@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { guard, bad, readBody } from '@/lib/http'
-import { COOKIE_NAME, MFA_THROTTLE } from '@/lib/auth/config.mjs'
+import { MFA_THROTTLE } from '@/lib/auth/config.mjs'
 import { verifyMfaTicket } from '@/lib/auth/token.mjs'
 import { checkSecondFactor } from '@/lib/auth/mfa'
-import { clearFailures, clientIp, cookieOptions, createSession, isKnownIp, lockedSeconds, logAuthEvent, recordFailure, rememberIp, throttleKey } from '@/lib/auth/session'
+import { abrirCuenta } from '@/lib/auth/cuentas'
+import { conEntrada, escribirCookie, leerCookie, recordar } from '@/lib/auth/dispositivos'
+import { clearFailures, clientIp, createSession, isKnownIp, lockedSeconds, logAuthEvent, recordFailure, rememberIp, throttleKey } from '@/lib/auth/session'
 import sql from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -49,6 +51,14 @@ export const POST = guard(async (request) => {
   const { token, maxAge } = await createSession(uid, request.headers.get('user-agent') || '')
   await logAuthEvent(request, r.kind === 'recovery' ? 'login_ok_recovery' : 'login_ok', uid)
   const res = NextResponse.json({ ok: true, expiresAt: Date.now() + maxAge * 1000, recoveryLeft: r.kind === 'recovery' ? r.left : undefined })
-  res.cookies.set(COOKIE_NAME, token, cookieOptions(maxAge))
+  await abrirCuenta(request, res, token, uid, maxAge)
+  if (body.remember === true) {
+    const [u] = await sql`SELECT role, must_change_password FROM users WHERE id = ${uid}`
+    if (u && !u.must_change_password) {
+      const nuevo = await recordar(uid, u.role, request.headers.get('user-agent') || '')
+      escribirCookie(res, await conEntrada(leerCookie(request), nuevo, uid))
+      await logAuthEvent(request, 'device_remember', uid)
+    }
+  }
   return res
 }, { auth: false })

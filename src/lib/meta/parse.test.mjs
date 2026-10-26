@@ -34,7 +34,7 @@ test('estado y referencia', () => {
 })
 test('rutas de Meta: solo lectura de la cuenta; el ID de cuenta se normaliza', () => {
   for (const p of ['/v23.0/act_941640195133155', '/v23.0/act_941640195133155/insights']) assert.equal(rutaMetaPermitida(p), true, p)
-  assert.equal(rutaMetaPermitida('/v23.0/act_941640195133155/transactions'), false) // los cobros ya no se piden a Meta
+  assert.equal(rutaMetaPermitida('/v23.0/act_941640195133155/transactions'), false) // Meta ya no tiene ese campo (HTTP 400, #100): los cobros no se piden a la API
   for (const p of ['/v23.0/me/adaccounts', '/v23.0/act_941640195133155/campaigns', '/v23.0/act_941640195133155/adsets', '/act_1/insights', '/v23.0/act_941640195133155/insights/extra']) assert.equal(rutaMetaPermitida(p), false, p)
   assert.equal(cuentaMeta('941640195133155'), 'act_941640195133155'); assert.equal(cuentaMeta(' act_941640195133155 '), 'act_941640195133155'); assert.equal(cuentaMeta('abc'), null)
 })

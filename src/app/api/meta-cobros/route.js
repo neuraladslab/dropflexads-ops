@@ -37,9 +37,9 @@ async function insertar(uid, filas, fuente) {
   return nuevos
 }
 
-/** POST {action:'add', date, amount, reference?, paymentRef?, status?, notes?} · {action:'import', format, charges:[…]} · {action:'delete', ids:[…]} */
+/** POST {action:'add', date, amount, reference?, paymentRef?, status?, notes?} · {action:'import', format, charges:[…]} · {action:'set_ref', id, paymentRef} · {action:'delete', ids:[…]} */
 export const POST = guard(async (request, _ctx, session) => {
-  const uid = session.userId, b = await readBody(request)
+  const uid = session.ownerId, b = await readBody(request)
   if (!b) return bad('Cuerpo de la solicitud inválido.')
   const hoy = maxDate()
 
@@ -68,6 +68,19 @@ export const POST = guard(async (request, _ctx, session) => {
     const nuevos = await insertar(uid, filas, 'archivo')
     if (nuevos) await logActivity(uid, `Importaste ${nuevos} ${nuevos === 1 ? 'cobro' : 'cobros'} de Meta`)
     return ok({ imported: nuevos, skipped: filas.length - nuevos, invalid: invalidos, before: anteriores }, 201)
+  }
+
+  if (b.action === 'set_ref') {
+    // La referencia de pago («FACEBK *PZ4XV8SWF4» → PZ4XV8SWF4) es la llave para cruzar el cobro con la tarjeta de Dropi. Vacía = quitarla.
+    if (!isId(b.id)) return bad('Cobro no válido.')
+    const ref = clip(b.paymentRef, 24).toUpperCase()
+    if (ref && !/^[A-Z0-9]{6,24}$/.test(ref)) return bad('La referencia son 6 a 24 letras y números (sin espacios ni «FACEBK *»).')
+    try {
+      const r = await sql`UPDATE meta_charges SET payment_ref = ${ref || null} WHERE owner_id = ${uid} AND id = ${Number(b.id)} RETURNING id`
+      if (!r.length) return bad('Ese cobro no existe.', 404)
+    } catch (e) { if (e && e.code === '23505') return bad('Esa referencia ya está en otro cobro.', 409); throw e }
+    await logActivity(uid, ref ? `Pusiste la referencia ${ref} a un cobro de Meta` : 'Quitaste la referencia de un cobro de Meta')
+    return ok({ ok: true })
   }
 
   if (b.action === 'delete') {

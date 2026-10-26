@@ -135,7 +135,9 @@ test("ventana: un día o un rango exacto, con tope de 120 días", () => {
   const e = { hoy: "2026-10-10", inicioOperacion: "2026-09-26", hayDatos: true, ultimaSyncDia: "2026-10-09" };
   assert.deepEqual(calcularVentana({ ...e, from: "2026-09-30", to: "2026-09-30" }), { from: "2026-09-30", to: "2026-09-30" });
   assert.deepEqual(calcularVentana({ ...e, from: "2026-09-28" }), { from: "2026-09-28", to: "2026-10-10" });
-  assert.equal(calcularVentana({ ...e, from: "2025-01-01" }).from, "2026-06-12"); // hoy − 120 días
+  assert.equal(calcularVentana({ ...e, from: "2025-01-01" }).from, "2026-09-26"); // nunca antes del inicio de la operación
+  // Con una operación vieja, manda el piso de los 3 meses (el mes actual y los 2 anteriores).
+  assert.equal(calcularVentana({ hoy: "2026-10-10", inicioOperacion: "2026-05-01", hayDatos: false }).from, "2026-08-01");
 });
 test("validarRango: mensajes claros", () => {
   const hoy = "2026-10-10";
@@ -147,16 +149,34 @@ test("validarRango: mensajes claros", () => {
   assert.match(validarRango("2026-01-01", "2026-10-10", hoy)!, /120/);
 });
 
-import { validarInicio, dentroDeOperacion } from "./ventana.ts";
+import { dentroDeOperacion, pisoInicio, mesesPermitidos, validarRangoOperacion, inicioDelMes, mesYAnio, pisoSync, mesesSincronizables } from "./ventana.ts";
 
-test("validarInicio: fecha desde la que se sincroniza", () => {
-  const hoy = "2026-10-10";
-  assert.equal(validarInicio("2026-09-26", hoy), null);
-  assert.equal(validarInicio("2026-10-10", hoy), null);
-  assert.match(validarInicio("2026-10-11", hoy)!, /futura/);
-  assert.match(validarInicio("26/09/2026", hoy)!, /válida/);
-  assert.match(validarInicio("2026-01-01", hoy)!, /120/);
-  assert.match(validarInicio(undefined, hoy)!, /válida/);
+test("piso de inicio: el mes actual y los 2 anteriores, también al cruzar de año", () => {
+  assert.equal(pisoInicio("2026-10-25"), "2026-08-01");
+  assert.equal(pisoInicio("2026-01-05"), "2025-11-01");
+  assert.equal(pisoInicio("2026-02-28"), "2025-12-01");
+  assert.equal(mesesPermitidos("2026-10-25"), "agosto, septiembre y octubre de 2026");
+  assert.equal(mesesPermitidos("2026-01-05"), "noviembre de 2025, diciembre de 2025 y enero de 2026");
+});
+
+test("inicio de la operación implícito: día 1 del mes de registro; sincronizar por mes sin pasar el inicio ni los 3 meses", () => {
+  assert.equal(inicioDelMes("2026-10-17"), "2026-10-01");
+  assert.equal(mesYAnio("2026-10-01"), "octubre de 2026");
+  // Empresa registrada en octubre: en octubre solo octubre; en diciembre, octubre a diciembre; en enero ya no octubre.
+  assert.deepEqual(mesesSincronizables("2026-10-01", "2026-10-17").map((m) => m.mes), ["2026-10"]);
+  assert.deepEqual(mesesSincronizables("2026-10-01", "2026-12-05").map((m) => m.mes), ["2026-10", "2026-11", "2026-12"]);
+  assert.deepEqual(mesesSincronizables("2026-10-01", "2027-01-05").map((m) => m.mes), ["2026-11", "2026-12", "2027-01"]);
+  assert.equal(pisoSync("2026-10-01", "2027-01-05"), "2026-11-01");
+  assert.equal(pisoSync("2026-10-01", "2026-12-05"), "2026-10-01");
+  // Portal x empezó el 26 de septiembre: ese mes arranca el 26 y el mes actual termina hoy.
+  const px = mesesSincronizables("2026-09-26", "2026-10-25");
+  assert.deepEqual(px.map((m) => [m.mes, m.desde, m.hasta]), [["2026-09", "2026-09-26", "2026-09-30"], ["2026-10", "2026-10-01", "2026-10-25"]]);
+  const ok = (a: string, b: string, hoy = "2026-12-05") => validarRangoOperacion(a, b, hoy, "2026-10-01");
+  assert.equal(ok("2026-10-10", "2026-10-20"), null);
+  assert.equal(ok("2026-11-01", ""), null); // un solo día
+  assert.match(ok("2026-10-20", "2026-11-02")!, /un solo mes/);
+  assert.match(validarRangoOperacion("2026-09-30", "2026-09-30", "2026-10-05", "2026-10-01")!, /empieza el 2026-10-01/);
+  assert.match(validarRangoOperacion("2026-10-30", "2026-10-31", "2027-01-05", "2026-10-01")!, /noviembre/); // octubre ya no entra en los 3 meses
 });
 
 test("costo por venta real y reparto de costos", () => {
