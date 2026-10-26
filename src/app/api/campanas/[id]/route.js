@@ -19,18 +19,18 @@ export const PATCH = guard(async (request, ctx, session) => {
   if (b.productIds !== undefined && (!productIds || !productIds.length)) return bad('Elige al menos un producto.')
   if (nombre === undefined && productIds === undefined && activa === undefined && dev === undefined) return bad('No hay nada que cambiar.')
   const r = await sql`UPDATE campaigns SET name = COALESCE(${nombre ?? null}, name), product_ids = COALESCE(${productIds ?? null}, product_ids), active = COALESCE(${activa ?? null}, active)
-                      WHERE id = ${Number(id)} AND owner_id = ${session.userId} RETURNING name`
+                      WHERE id = ${Number(id)} AND owner_id = ${session.ownerId} RETURNING name`
   if (!r.length) return bad('No encontré esa campaña.', 404)
-  if (dev !== undefined) await sql`UPDATE campaigns SET return_pct = ${dev} WHERE id = ${Number(id)} AND owner_id = ${session.userId}` // la columna llega con la migración
-  await logActivity(session.userId, `Cambiaste la campaña «${r[0].name}»`)
+  if (dev !== undefined) await sql`UPDATE campaigns SET return_pct = ${dev} WHERE id = ${Number(id)} AND owner_id = ${session.ownerId}` // la columna llega con la migración
+  await logActivity(session.ownerId, `Cambiaste la campaña «${r[0].name}»`)
   return ok({ ok: true })
 })
 
 export const DELETE = guard(async (_req, ctx, session) => {
   const { id } = await ctx.params
   if (!isId(id)) return bad('Campaña no válida.', 404)
-  const r = await sql`DELETE FROM campaigns WHERE id = ${Number(id)} AND owner_id = ${session.userId} RETURNING name`
+  const r = await sql`DELETE FROM campaigns WHERE id = ${Number(id)} AND owner_id = ${session.ownerId} RETURNING name`
   if (!r.length) return bad('No encontré esa campaña.', 404)
-  await logActivity(session.userId, `Eliminaste la campaña «${r[0].name}»`)
+  await logActivity(session.ownerId, `Eliminaste la campaña «${r[0].name}»`)
   return ok({ ok: true })
 })

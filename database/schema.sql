@@ -370,3 +370,58 @@ CREATE TABLE IF NOT EXISTS creative_copies (
   PRIMARY KEY (creative_id, position)
 );
 CREATE INDEX IF NOT EXISTS idx_creative_copies_owner ON creative_copies (owner_id, creative_id);
+
+-- ============================================================
+-- Varias empresas. Toda la operación ya cuelga de `owner_id`; una empresa es un «dueño de datos»: su `owner_id` es el usuario que figura como propietario,
+-- así que ninguna tabla de datos cambia. Una empresa nueva trae su propia cuenta de Dropi, de Meta, su IA y su contabilidad.
+CREATE TABLE IF NOT EXISTS companies (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(80) NOT NULL,
+  owner_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_companies_name ON companies (lower(name));
+
+-- role: 'member' (administrador de su empresa: ve y gestiona solo lo suyo) | 'superadmin' (administra la plataforma: crea, edita y desactiva empresas y crea sus administradores; NO ve los datos de ninguna empresa y no pertenece a una).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(10) NOT NULL DEFAULT 'member';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_users_company ON users (company_id);
+-- (El superadmin ya no entra a las empresas: se quita la columna que lo permitía.)
+ALTER TABLE sessions DROP COLUMN IF EXISTS active_company_id;
+
+-- La operación que ya existía es la empresa «Portal x»: su dueño de datos es el usuario que ya tiene datos (el de la conexión de Dropi; si no, el de los ajustes; si no, el primero),
+-- sin mover ningún dato. Solo corre si aún no hay empresas.
+INSERT INTO companies (name, owner_id)
+  SELECT 'Portal x', COALESCE((SELECT owner_id FROM dropi_connections ORDER BY owner_id LIMIT 1), (SELECT owner_id FROM app_settings ORDER BY owner_id LIMIT 1), (SELECT MIN(id) FROM users))
+  WHERE NOT EXISTS (SELECT 1 FROM companies) AND EXISTS (SELECT 1 FROM users);
+UPDATE users u SET company_id = c.id FROM companies c WHERE c.owner_id = u.id AND u.company_id IS NULL;
+
+-- ============================================================
+-- Contraseña inicial y dispositivos recordados.
+-- Una contraseña que puso el superadmin (alta o restablecimiento) debe cambiarse en el primer ingreso: mientras tanto no se puede usar nada más.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- «Recordar este dispositivo»: entrar sin escribir la contraseña desde un equipo personal. En el navegador solo vive un secreto aleatorio (cookie httpOnly);
+-- aquí solo su huella. Cada uso lo rota. Cambiar la contraseña, deshabilitar al usuario o eliminar el dispositivo lo invalida.
+CREATE TABLE IF NOT EXISTS trusted_devices (
+  id UUID PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  secret_hash VARCHAR(64) NOT NULL,
+  prev_hash VARCHAR(64),                       -- secreto anterior: vale 30 s tras rotar (dos pestañas a la vez no se leen como robo)
+  rotated_at TIMESTAMPTZ,
+  label VARCHAR(120) NOT NULL,                 -- «Chrome en macOS»
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices (user_id, last_used_at DESC);
+
+-- El inicio de la operación es implícito: el día 1 del mes en que se registra la empresa. Portal x conserva el suyo (antes salía de una constante): se guarda explícito.
+INSERT INTO app_settings (owner_id, key, value)
+  SELECT owner_id, 'op_from', '2026-09-26' FROM companies WHERE lower(name) = 'portal x'
+ON CONFLICT (owner_id, key) DO NOTHING;
+INSERT INTO app_settings (owner_id, key, value)
+  SELECT owner_id, 'op_from', to_char(date_trunc('month', created_at AT TIME ZONE 'America/Bogota'), 'YYYY-MM-DD') FROM companies
+ON CONFLICT (owner_id, key) DO NOTHING;

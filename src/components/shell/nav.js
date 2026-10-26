@@ -22,11 +22,21 @@ export const SECCIONES = [
     { href: '/calculadora', icono: 'percent', titulo: 'Calculadora', desc: 'Simula tus números antes de montar pauta para asegurar tu rentabilidad.' },
   ] },
   { id: 'aprender', etiqueta: 'Aprender', items: [
-    { href: '/aprender', icono: 'book', titulo: 'Aprender', desc: 'Qué significa cada cifra, con ejemplos y cómo usarla para decidir' },
+    { href: '/aprender', icono: 'book', titulo: 'Aprender', desc: 'Qué significa cada cifra y cómo conectar Dropi y Meta paso a paso', tabs: [
+      { slug: '', titulo: 'Qué significa cada cifra' },
+      { slug: 'conexion', titulo: 'Guía de conexión' },
+    ] },
+  ] },
+  { id: 'cuenta', etiqueta: 'Cuenta', todos: true, items: [
+    { href: '/seguridad', icono: 'lock', titulo: 'Seguridad', desc: 'Tu contraseña y los dispositivos desde los que entras con un clic', todos: true },
+  ] },
+  { id: 'admin', etiqueta: 'Administración', soloSuper: true, items: [
+    { href: '/empresas', icono: 'building', titulo: 'Empresas', desc: 'Crea, edita y desactiva empresas y a sus administradores. No ves los datos de ninguna: son de cada empresa', soloSuper: true },
   ] },
   { id: 'config', etiqueta: 'Configuración', items: [
-    { href: '/configuracion', icono: 'box', titulo: 'Configuración', desc: 'Cuenta de Meta, herramientas mensuales, corte y reparto', tabs: [
+    { href: '/configuracion', icono: 'box', titulo: 'Configuración', desc: 'Cuenta de Meta, desde cuándo empieza tu operación, herramientas mensuales, corte y reparto', tabs: [
       { slug: '', titulo: 'Cuenta de Meta' },
+      { slug: 'inicio', titulo: 'Inicio de la operación' },
       { slug: 'herramientas', titulo: 'Herramientas de operación' },
       { slug: 'corte', titulo: 'Corte del mes' },
       { slug: 'reparto', titulo: 'Reparto' },

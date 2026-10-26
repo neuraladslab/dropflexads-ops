@@ -9,8 +9,8 @@ export const GET = guard(async (request, ctx, session) => {
   const { id } = await ctx.params
   if (!/^\d{4}-\d{2}-\d{2}$/.test(id)) return bad('Corte no válido.', 404)
   const tabla = new URL(request.url).searchParams.get('tabla') === 'pedidos' ? 'pedidos' : 'movimientos'
-  const c = (await datosCortes(session.userId)).cortes.find((x) => x.id === id)
+  const c = (await datosCortes(session.ownerId)).cortes.find((x) => x.id === id)
   if (!c) return bad('No encontré ese corte.', 404)
-  const cuerpo = tabla === 'pedidos' ? await csvPedidos(session.userId, c) : await csvMovimientos(session.userId, c)
+  const cuerpo = tabla === 'pedidos' ? await csvPedidos(session.ownerId, c) : await csvMovimientos(session.ownerId, c)
   return new Response(cuerpo, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="corte-${c.hasta}-${tabla}.csv"` } })
 })

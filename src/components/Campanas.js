@@ -19,15 +19,14 @@ async function api(method, url, body) {
 // Un producto sin ventas todavía no sale de los pedidos: se trae de Dropi por su ID (el número al final de la dirección del producto en Dropi).
 function AgregarPorId({ onAgregado }) {
   const [id, setId] = useState('')
-  const [otp, setOtp] = useState('')
   const [pideOtp, setPideOtp] = useState(false)
   const [error, setError] = useState('')
   const [buscando, setBuscando] = useState(false)
   async function agregar() {
     setError(''); setBuscando(true)
     try {
-      const p = await api('POST', '/api/dropi/productos', { id: id.trim(), ...(otp ? { otp } : {}) })
-      setId(''); setOtp(''); setPideOtp(false)
+      const p = await api('POST', '/api/dropi/productos', { id: id.trim() })
+      setId(''); setPideOtp(false)
       onAgregado(p)
     } catch (ex) {
       setPideOtp(ex.code === 'need_otp' || ex.code === 'otp_rejected'); setError(ex.message)
@@ -39,7 +38,7 @@ function AgregarPorId({ onAgregado }) {
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <div className="inp" style={{ flex: 1, minWidth: 180 }}><input type="text" inputMode="numeric" placeholder="¿Aún sin ventas? Agrega por ID de Dropi" aria-label="ID del producto en Dropi" value={id} onChange={(e) => setId(e.target.value.replace(/\D/g, '').slice(0, 12))} onKeyDown={enter} style={{ fontSize: 16 }} /></div>
-        {pideOtp && <div className="inp" style={{ width: 130 }}><input type="text" inputMode="numeric" placeholder="Código Dropi" aria-label="Código del autenticador de Dropi" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))} onKeyDown={enter} style={{ fontSize: 16 }} /></div>}
+        {pideOtp && <button className="btn" type="button" onClick={() => window.dispatchEvent(new Event('dfa:abrir-sync'))}>Poner código de Dropi</button>}
         <button className="btn ghost" type="button" disabled={buscando || !id.trim()} onClick={agregar}>{buscando ? 'Buscando…' : 'Agregar'}</button>
       </div>
       {error && <span className="errm" role="alert" style={{ display: 'block', marginTop: 6 }}>{error}</span>}

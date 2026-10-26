@@ -133,13 +133,18 @@ export function TablaGastoMeta({ filas }) {
   )
 }
 
-export function TablaCobrosMeta({ cobros, onQuitar }) {
+export function TablaCobrosMeta({ cobros, onQuitar, onReferencia }) {
   const rows = cobros.map((c) => ({ ...c, valor: c.monto, texto: plano(c.ref, c.transaccion, c.monto, c.fecha, COBRO[c.estado][1]) }))
   return (
     <TablaFiltrable filas={rows} neutro estados={opciones(COBRO)} unidad="cobros" buscar="Buscar por referencia, monto o estado…" vacio="Aún no hay cobros de Meta."
       columnas={[
         { titulo: 'Fecha', izq: true, celda: (f) => diaCorto(f.fecha) },
-        { titulo: 'Referencia de pago', txt: true, celda: (f) => f.ref || <span className="muted">sin referencia: se cruza por monto y fecha</span> },
+        { titulo: 'Referencia de pago', txt: true, celda: (f) => (
+          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {f.ref || <span className="muted">sin referencia: se cruza por monto y fecha</span>}
+            {onReferencia && <button className="btn ghost sm" onClick={() => onReferencia(f)}>{f.ref ? 'Editar' : 'Poner referencia'}</button>}
+          </span>
+        ) },
         { titulo: 'Transacción', txt: true, celda: (f) => f.transaccion || <span className="muted">—</span> },
         { titulo: 'Importe (con IVA)', celda: (f) => cop(f.monto) },
         { titulo: 'Con tu tarjeta', izq: true, celda: (f) => <Chip t={COBRO[f.estado][0]}>{COBRO[f.estado][1]}</Chip> },

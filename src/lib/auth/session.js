@@ -39,20 +39,27 @@ export async function loadSession(token, { touch = true } = {}) {
   if (!p || !UUID.test(p.jti)) return null
   const uid = Number(p.sub)
   if (!Number.isInteger(uid)) return null
+  // `ownerId` = dueño de los datos con los que se trabaja (la empresa del usuario). Sin empresa asignada (usuarios anteriores a las empresas) se cae a su propio id,
+  // que es como funcionaba antes. El superadmin no pertenece a ninguna empresa: administra la plataforma y no ve datos de empresas (ver `guard`).
   const rows = await sql`
-    SELECT s.id, s.user_id, u.email,
+    SELECT s.id, s.user_id, u.email, u.role, u.must_change_password, COALESCE(c.owner_id, u.id) AS owner_id, c.id AS company_id, c.name AS company_name,
            (extract(epoch from s.expires_at) * 1000)::bigint AS expires_ms
     FROM sessions s JOIN users u ON u.id = s.user_id
+    LEFT JOIN companies c ON c.id = u.company_id
     WHERE s.id = ${p.jti} AND s.user_id = ${uid}
       AND s.revoked_at IS NULL
       AND s.expires_at > NOW()
       AND s.last_seen_at > NOW() - make_interval(secs => ${IDLE_TTL_SECONDS})
       AND u.disabled_at IS NULL
+      AND (c.id IS NULL OR c.active) -- una empresa desactivada deja sin acceso a sus usuarios
       AND s.created_at >= u.password_changed_at`
   if (!rows.length) return null
   if (touch) await sql`UPDATE sessions SET last_seen_at = NOW() WHERE id = ${p.jti} AND last_seen_at < NOW() - interval '60 seconds'`
   const r = rows[0]
-  return { sessionId: r.id, userId: r.user_id, email: r.email, expiresAt: Number(r.expires_ms), idleSeconds: IDLE_TTL_SECONDS }
+  return {
+    sessionId: r.id, userId: r.user_id, email: r.email, expiresAt: Number(r.expires_ms), idleSeconds: IDLE_TTL_SECONDS,
+    ownerId: r.owner_id, role: r.role, mustChange: r.must_change_password, esSuperadmin: r.role === 'superadmin', empresa: r.company_id ? { id: r.company_id, nombre: r.company_name } : null,
+  }
 }
 
 /** Sesión a partir de una petición de Route Handler. */

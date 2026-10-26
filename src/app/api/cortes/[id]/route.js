@@ -14,7 +14,7 @@ export const POST = guard(async (request, ctx, session) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(id)) return bad('Corte no válido.', 404)
   const b = (await readBody(request)) || {}
   const nota = typeof b.nota === 'string' ? b.nota.trim().slice(0, 300) || null : null
-  const d = await datosCortes(session.userId)
+  const d = await datosCortes(session.ownerId)
   const c = d.cortes.find((x) => x.id === id)
   if (!c) return bad('No encontré ese corte.', 404)
   if (c.abierto) return bad('Este corte todavía no termina: se puede sellar después de su último día.')
@@ -23,10 +23,10 @@ export const POST = guard(async (request, ctx, session) => {
   // La versión se calcula como MAX+1; si dos sellados llegan a la vez la restricción única lo detecta (23505) y se reintenta una vez en vez de responder con un error.
   const insertar = () => sql`
     INSERT INTO cut_closures (owner_id, period_start, period_end, version, snapshot, note)
-    VALUES (${session.userId}, ${c.desde}, ${c.hasta}, COALESCE((SELECT MAX(version) FROM cut_closures WHERE owner_id = ${session.userId} AND period_end = ${c.hasta}), 0) + 1, ${sql.json(foto)}, ${nota})
+    VALUES (${session.ownerId}, ${c.desde}, ${c.hasta}, COALESCE((SELECT MAX(version) FROM cut_closures WHERE owner_id = ${session.ownerId} AND period_end = ${c.hasta}), 0) + 1, ${sql.json(foto)}, ${nota})
     RETURNING version`
   let r
   try { [r] = await insertar() } catch (e) { if (e && e.code === '23505') [r] = await insertar(); else throw e }
-  await logActivity(session.userId, `Sellaste el corte ${c.desde} → ${c.hasta} (versión ${r.version})`)
+  await logActivity(session.ownerId, `Sellaste el corte ${c.desde} → ${c.hasta} (versión ${r.version})`)
   return ok({ version: r.version }, 201)
 })

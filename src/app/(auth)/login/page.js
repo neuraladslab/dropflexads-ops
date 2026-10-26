@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation'
 import LoginForm from '@/components/auth/LoginForm'
+import { cookies } from 'next/headers'
 import { getServerSession } from '@/lib/auth/session'
+import { DEVICE_COOKIE_NAME } from '@/lib/auth/config.mjs'
+import { entradas, recordadas } from '@/lib/auth/dispositivos'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Iniciar sesión · DropFlexAds' }
@@ -29,11 +32,14 @@ export default async function LoginPage({ searchParams }) {
     session = null
   }
   const next = safeNext(sp?.next)
-  if (session) redirect(next)
+  const agregar = sp?.agregar === '1'
+  if (session && !agregar) redirect(next) // con ?agregar=1 se queda: es para abrir otra cuenta sin cerrar la actual
+  let recordados = []
+  try { recordados = await recordadas(entradas((await cookies()).get(DEVICE_COOKIE_NAME)?.value)) } catch { recordados = [] }
   const notice = NOTICES[typeof sp?.m === 'string' ? sp.m : ''] || ''
   return (
     <main className="login-wrap">
-      <LoginForm next={next} notice={notice} />
+      <LoginForm next={next} notice={notice} agregar={agregar && !!session} recordadas={recordados} />
     </main>
   )
 }

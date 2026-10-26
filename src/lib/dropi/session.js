@@ -22,7 +22,7 @@ export const enc = (uid, field, v) => encryptSecret(String(v), aad(uid, field))
 export const dec = (uid, field, v) => (v ? decryptSecret(v, aad(uid, field)) : null)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const JWT_RE = /^[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*$/
-const OTP_RE = /^\d{6,8}$/
+const OTP_RE = /^\d{6}$/
 
 const jwtExp = (jwt) => {
   try {

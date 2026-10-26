@@ -54,8 +54,8 @@ export function windowAndDedupe(rows, { from, to }, seen = new Set()) {
 
 /** → { ok, skipped?, pages, inserted, updated, unchanged, invalid, window, error? }. Nunca lanza por errores de Dropi: los devuelve como `error`. */
 /**
- * `from`/`to` piden un rango exacto y `full` el histórico desde el inicio de la operación (sin ellos, la ventana incremental). Con `replace` se BORRAN los movimientos guardados de la tarjeta y se cargan de nuevo
- * los leídos de Dropi, pero SOLO si la lectura salió completa y trajo movimientos (si algo falla, lo que había se conserva intacto).
+ * `from`/`to` piden un rango exacto y `full` el histórico desde el inicio de la operación (sin ellos, la ventana incremental). Con `replace` se BORRAN los movimientos guardados de la tarjeta DE LOS DÍAS DE LA VENTANA y se cargan de nuevo
+ * los leídos de Dropi (lo de meses anteriores nunca se toca), pero SOLO si la lectura salió completa y trajo movimientos (si algo falla, lo que había se conserva intacto).
  */
 export async function syncCardTransactions(uid, { budgetMs = SYNC_BUDGET_MS, ip = '', otp = '', from = null, to = null, full = false, replace = false } = {}) {
   // Reserva la sincronización de forma atómica: nada de dos a la vez ni más seguidas que el intervalo mínimo.
@@ -151,7 +151,8 @@ export async function syncCardTransactions(uid, { budgetMs = SYNC_BUDGET_MS, ip 
   let imp = { inserted: 0, updated: 0, duplicated: 0, invalid: 0 }
   try {
     if (rows.length) {
-      if (replace && !err && !incomplete) await sql`DELETE FROM card_transactions WHERE owner_id = ${uid}`
+      // «Reiniciar» rehace SOLO los días de la ventana que se está trayendo; lo de meses anteriores se conserva siempre.
+      if (replace && !err && !incomplete) await sql`DELETE FROM card_transactions WHERE owner_id = ${uid} AND tx_date >= ${win.from} AND tx_date <= ${win.to}`
       const r = await importCardRows(uid, rows)
       if (!r.error) imp = r
     }

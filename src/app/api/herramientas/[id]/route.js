@@ -13,13 +13,13 @@ export const PATCH = guard(async (request, ctx, session) => {
   const activa = b && typeof b.activa === 'boolean' ? b.activa : undefined
   if (mensual === undefined && activa === undefined) return bad('No hay nada que cambiar.')
   const r = await sql`UPDATE fixed_costs SET monthly_amount = COALESCE(${mensual ?? null}, monthly_amount), active = COALESCE(${activa ?? null}, active)
-                      WHERE id = ${Number(id)} AND owner_id = ${session.userId} RETURNING id`
+                      WHERE id = ${Number(id)} AND owner_id = ${session.ownerId} RETURNING id`
   return r.length ? ok({ ok: true }) : bad('No encontré esa herramienta.', 404)
 })
 
 export const DELETE = guard(async (_req, ctx, session) => {
   const { id } = await ctx.params
   if (!isId(id)) return bad('Herramienta no válida.', 404)
-  const r = await sql`DELETE FROM fixed_costs WHERE id = ${Number(id)} AND owner_id = ${session.userId} RETURNING id`
+  const r = await sql`DELETE FROM fixed_costs WHERE id = ${Number(id)} AND owner_id = ${session.ownerId} RETURNING id`
   return r.length ? ok({ ok: true }) : bad('No encontré esa herramienta.', 404)
 })

@@ -7,7 +7,7 @@ import { SECCIONES } from './nav'
 import { Icono } from './Icono'
 import Paleta from './Paleta'
 import { AsistenteFlotante } from '@/components/ia/AsistenteFlotante'
-import EstadoDatos from './EstadoDatos'
+import SincronizarBarra from './SincronizarBarra'
 
 const activo = (pathname, href) => (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/'))
 const ls = {
@@ -15,7 +15,7 @@ const ls = {
   set: (k, v) => { try { localStorage.setItem(k, v) } catch { /* sin almacenamiento: no pasa nada */ } },
 }
 
-export default function AppShell({ email, children }) {
+export default function AppShell({ email, empresa, esSuperadmin, children }) {
   const pathname = usePathname()
   const router = useRouter()
   const [min, setMin] = useState(false)
@@ -23,6 +23,8 @@ export default function AppShell({ email, children }) {
   const [paleta, setPaleta] = useState(false)
   const [menu, setMenu] = useState(false)
   const [saliendo, setSaliendo] = useState(false)
+  const [cuentas, setCuentas] = useState(null) // otras cuentas abiertas en este navegador
+  const [trabajando, setTrabajando] = useState('')
   const menuRef = useRef(null)
 
   // Preferencias de este navegador: menú minimizado y nivel de ayuda (Aprendiz / Avanzado).
@@ -50,10 +52,33 @@ export default function AppShell({ email, children }) {
     return () => document.removeEventListener('mousedown', f)
   }, [menu])
 
+  // Al abrir el menú se leen las demás cuentas abiertas en este navegador (nunca trae tokens).
+  useEffect(() => {
+    if (!menu) return
+    let vivo = true
+    fetch('/api/auth/cuentas').then((r) => (r.ok ? r.json() : null)).then((d) => { if (vivo && d) setCuentas(d.otras) }).catch(() => {})
+    return () => { vivo = false }
+  }, [menu])
+
   const salir = useCallback(async () => {
     setSaliendo(true)
-    try { await fetch('/api/auth/logout', { method: 'POST' }) } finally { router.replace('/login'); router.refresh() }
+    try {
+      const res = await fetch('/api/auth/logout', { method: 'POST' })
+      const d = await res.json().catch(() => ({}))
+      if (d.siguiente) { window.location.assign('/'); return } // quedaba otra cuenta abierta: pasa a ser la activa (recarga completa, sin datos de la anterior)
+    } catch { /* igual se va al login */ }
+    router.replace('/login'); router.refresh()
   }, [router])
+
+  async function cuenta(accion, id) {
+    setTrabajando(id)
+    try {
+      const res = await fetch('/api/auth/cuentas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: accion, id }) })
+      if (!res.ok) throw new Error()
+      if (accion === 'switch') window.location.assign('/') // recarga completa: se descarta todo lo de la cuenta anterior
+      else setCuentas((l) => (l || []).filter((c) => c.id !== id))
+    } catch { setCuentas(null); setMenu(false) } finally { setTrabajando('') }
+  }
 
   return (
     <>
@@ -62,10 +87,10 @@ export default function AppShell({ email, children }) {
         <aside className="side" aria-label="Navegación principal">
           <div className="brand">
             <div className="brand-mark"><Icono n="truck" size={22} /></div>
-            <div><div className="brand-name">DropFlexAds</div><div className="brand-sub">Colombia Ops</div></div>
+            <div><div className="brand-name">DropFlexAds</div><div className="brand-sub">{esSuperadmin ? 'Plataforma' : empresa ? empresa.nombre : 'Colombia Ops'}</div></div>
           </div>
           <nav className="nav" aria-label="Secciones">
-            {SECCIONES.map((s) => (
+            {SECCIONES.filter((s) => s.todos || esSuperadmin === !!s.soloSuper).map((s) => (
               <div className="nav-g" role="group" aria-label={s.etiqueta} key={s.id}>
                 <div className="nav-l">{s.etiqueta}</div>
                 {s.items.map((i) => {
@@ -95,7 +120,8 @@ export default function AppShell({ email, children }) {
               <kbd>⌘K</kbd>
             </button>
             <div className="spacer" />
-            <EstadoDatos />
+            {!esSuperadmin && empresa && <span className="chip" title="Tu empresa">{empresa.nombre}</span>}
+            {!esSuperadmin && <SincronizarBarra />}
             <div className="seg" role="group" aria-label="Nivel de ayuda">
               <button type="button" aria-pressed={nivel === 'learner'} className={nivel === 'learner' ? 'on' : ''} onClick={() => cambiarNivel('learner')}><span className="m-lg">Modo Aprendiz</span><span className="m-sm">Aprendiz</span></button>
               <button type="button" aria-pressed={nivel === 'pro'} className={nivel === 'pro' ? 'on' : ''} onClick={() => cambiarNivel('pro')}>Avanzado</button>
@@ -107,6 +133,22 @@ export default function AppShell({ email, children }) {
               {menu && (
                 <div className="pop" role="menu" style={{ position: 'absolute', right: 0, top: 48 }}>
                   <div className="um-mail">{email}</div>
+                  {cuentas && cuentas.length > 0 && (
+                    <div className="um-cuentas" role="group" aria-label="Otras cuentas abiertas">
+                      <div className="um-tit">Otras cuentas abiertas</div>
+                      {cuentas.map((c) => (
+                        <div className="um-cta" key={c.id}>
+                          <button className="um-item" role="menuitem" disabled={!!trabajando} onClick={() => cuenta('switch', c.id)} title={`Cambiar a ${c.email}`}>
+                            <span className="um-cta-mail">{c.email}</span>
+                            <span className="muted um-cta-sub">{c.esSuperadmin ? 'Superadmin' : c.empresa || 'Cuenta'}</span>
+                          </button>
+                          <button className="um-x" aria-label={`Cerrar la sesión de ${c.email}`} title="Cerrar esta sesión" disabled={!!trabajando} onClick={() => cuenta('remove', c.id)}><Icono n="x" size={14} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <Link className="um-item" role="menuitem" href="/seguridad" onClick={() => setMenu(false)}>Seguridad y dispositivos</Link>
+                  <a className="um-item" role="menuitem" href="/login?agregar=1">Agregar otra cuenta</a>
                   <button className="um-item out" role="menuitem" onClick={salir} disabled={saliendo}>{saliendo ? 'Saliendo…' : 'Cerrar sesión'}</button>
                 </div>
               )}
@@ -115,8 +157,8 @@ export default function AppShell({ email, children }) {
           <div id="view" className="view" tabIndex={-1}>{children}</div>
         </main>
       </div>
-      <Paleta abierta={paleta} onCerrar={() => setPaleta(false)} />
-      <AsistenteFlotante />
+      <Paleta abierta={paleta} onCerrar={() => setPaleta(false)} esSuperadmin={esSuperadmin} />
+      {!esSuperadmin && <AsistenteFlotante />}
     </>
   )
 }

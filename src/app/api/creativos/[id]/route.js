@@ -11,7 +11,7 @@ export const PATCH = guard(async (request, ctx, session) => {
   const { id } = await ctx.params
   if (!isId(id)) return bad('Creativo no válido.', 404)
   const b = (await readBody(request)) || {}
-  const [act] = await sql`SELECT id, name, status FROM creatives WHERE id = ${Number(id)} AND owner_id = ${session.userId}`
+  const [act] = await sql`SELECT id, name, status FROM creatives WHERE id = ${Number(id)} AND owner_id = ${session.ownerId}`
   if (!act) return bad('No encontré ese creativo.', 404)
   const campos = []
   let estado = null
@@ -27,7 +27,7 @@ export const PATCH = guard(async (request, ctx, session) => {
   if (b.metaAdId !== undefined) { if (b.metaAdId === '' || b.metaAdId === null) adId = null; else if (/^\d{5,40}$/.test(String(b.metaAdId))) adId = String(b.metaAdId); else return bad('El anuncio de Meta no es válido.'); campos.push('anuncio') }
   if (!campos.length) return bad('No hay nada que cambiar.')
   // Un anuncio de Meta solo se enlaza si existe en el gasto sincronizado de este usuario.
-  if (adId) { const [e] = await sql`SELECT 1 AS x FROM meta_ad_spend_daily WHERE owner_id = ${session.userId} AND meta_ad_id = ${adId} LIMIT 1`; if (!e) return bad('Ese anuncio no aparece en el gasto sincronizado de Meta.') }
+  if (adId) { const [e] = await sql`SELECT 1 AS x FROM meta_ad_spend_daily WHERE owner_id = ${session.ownerId} AND meta_ad_id = ${adId} LIMIT 1`; if (!e) return bad('Ese anuncio no aparece en el gasto sincronizado de Meta.') }
   await sql`UPDATE creatives SET
               status = COALESCE(${estado}, status),
               status_changed_at = CASE WHEN ${estado}::text IS NOT NULL AND ${estado}::text <> status THEN NOW() ELSE status_changed_at END,
@@ -36,7 +36,7 @@ export const PATCH = guard(async (request, ctx, session) => {
               notes = CASE WHEN ${notas !== undefined} THEN ${notas ?? null} ELSE notes END,
               meta_ad_id = CASE WHEN ${adId !== undefined} THEN ${adId ?? null} ELSE meta_ad_id END,
               updated_at = NOW()
-            WHERE id = ${Number(id)} AND owner_id = ${session.userId}`
-  await logActivity(session.userId, `Cambiaste el creativo ${act.name}${estado && estado !== act.status ? `: de ${act.status} a ${estado}` : ` (${campos.join(', ')})`}`)
+            WHERE id = ${Number(id)} AND owner_id = ${session.ownerId}`
+  await logActivity(session.ownerId, `Cambiaste el creativo ${act.name}${estado && estado !== act.status ? `: de ${act.status} a ${estado}` : ` (${campos.join(', ')})`}`)
   return ok({ ok: true })
 })

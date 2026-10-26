@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import sql from '@/lib/db'
 import { guard, bad, readBody } from '@/lib/http'
-import { COOKIE_NAME, GLOBAL_THROTTLE, MAX_CONCURRENT_VERIFY, THROTTLE } from '@/lib/auth/config.mjs'
+import { GLOBAL_THROTTLE, MAX_CONCURRENT_VERIFY, THROTTLE } from '@/lib/auth/config.mjs'
 import { PASSWORD_MAX } from '@/lib/auth/policy.mjs'
 import { hashPassword, needsRehash, verifyPassword, burnVerification } from '@/lib/auth/password.mjs'
 import { signMfaTicket } from '@/lib/auth/token.mjs'
-import { clearFailures, clientIp, cookieOptions, createSession, isKnownIp, lockedSeconds, logAuthEvent, pruneAuthTables, recordFailure, rememberIp, throttleKey } from '@/lib/auth/session'
+import { abrirCuenta } from '@/lib/auth/cuentas'
+import { conEntrada, escribirCookie, leerCookie, recordar } from '@/lib/auth/dispositivos'
+import { clearFailures, clientIp, createSession, isKnownIp, lockedSeconds, logAuthEvent, pruneAuthTables, recordFailure, rememberIp, throttleKey } from '@/lib/auth/session'
 
 export const runtime = 'nodejs'
 
@@ -51,7 +53,7 @@ export const POST = guard(async (request) => {
   verifying++
   let user, valid = false
   try {
-    ;[user] = await sql`SELECT id, password_hash, totp_enabled_at FROM users WHERE lower(email) = ${email} AND disabled_at IS NULL`
+    ;[user] = await sql`SELECT id, password_hash, totp_enabled_at, role, must_change_password FROM users WHERE lower(email) = ${email} AND disabled_at IS NULL`
     if (user) valid = await verifyPassword(password, user.password_hash)
     else await burnVerification(password) // mismo costo si la cuenta no existe: no se puede enumerar usuarios por tiempos
   } finally {
@@ -82,6 +84,12 @@ export const POST = guard(async (request) => {
   await logAuthEvent(request, 'login_ok', user.id)
 
   const res = NextResponse.json({ ok: true, expiresAt: Date.now() + maxAge * 1000 })
-  res.cookies.set(COOKIE_NAME, token, cookieOptions(maxAge))
+  await abrirCuenta(request, res, token, user.id, maxAge)
+  // «Recordar este dispositivo»: solo con una contraseña propia (la inicial debe cambiarse antes).
+  if (body.remember === true && !user.must_change_password) {
+    const nuevo = await recordar(user.id, user.role, request.headers.get('user-agent') || '')
+    escribirCookie(res, await conEntrada(leerCookie(request), nuevo, user.id))
+    await logAuthEvent(request, 'device_remember', user.id)
+  }
   return res
 }, { auth: false })

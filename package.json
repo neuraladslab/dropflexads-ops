@@ -12,6 +12,7 @@
     "auth:init": "node scripts/auth-init.mjs",
     "auth:secret": "node scripts/auth-init.mjs --print",
     "demo:creativos": "node --env-file=.env.local scripts/demo-creativos.mjs",
+    "superadmin": "node --env-file=.env.local scripts/superadmin-set.mjs",
     "user:create": "node --env-file=.env.local scripts/user-create.mjs",
     "user:passwd": "node --env-file=.env.local scripts/user-passwd.mjs",
     "user:disable": "node --env-file=.env.local scripts/user-disable.mjs",
@@ -23,6 +24,7 @@
     "captura": "node scripts/captura.mjs",
     "lint:undef": "eslint --rule '{\"no-undef\":\"error\"}' src/lib src/app/api scripts",
     "verificar": "tsc --noEmit && npm run lint:undef && npm test",
+    "verificar:empresas": "node --conditions=react-server --import ./scripts/_alias-register.mjs --env-file=.env.local scripts/verificar-empresas.mjs",
     "verificar:cifras": "node --conditions=react-server --import ./scripts/_alias-register.mjs --env-file=.env.local scripts/verificar-cifras.mjs"
   },
   "dependencies": {

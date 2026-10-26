@@ -9,7 +9,7 @@ import { clearedCookieOptions, clearFailures, logAuthEvent, lockedSeconds, recor
 
 export const runtime = 'nodejs'
 
-/** Cambia la contraseña: exige la actual, aplica la política y CIERRA TODAS las sesiones (también la actual). */
+/** Cambia la contraseña: exige la actual, aplica la política y CIERRA TODAS las sesiones (también la actual) y olvida los dispositivos recordados. */
 export const POST = guard(async (request, _ctx, session) => {
   const body = await readBody(request)
   const current = typeof body?.current === 'string' ? body.current : ''
@@ -32,7 +32,8 @@ export const POST = guard(async (request, _ctx, session) => {
   if (breached > 0) return bad(BREACH_MESSAGE(breached), 400)
   if (next === current) return bad('La contraseña nueva debe ser distinta de la actual.', 400)
 
-  await sql`UPDATE users SET password_hash = ${await hashPassword(next)}, password_changed_at = NOW() WHERE id = ${user.id}`
+  await sql`UPDATE users SET password_hash = ${await hashPassword(next)}, password_changed_at = NOW(), must_change_password = FALSE WHERE id = ${user.id}`
+  await sql`DELETE FROM trusted_devices WHERE user_id = ${user.id}` // los dispositivos recordados dejan de valer con la contraseña anterior
   await clearFailures(key)
   await revokeAllForUser(user.id, 'password_change')
   await logAuthEvent(request, 'password_change', user.id)

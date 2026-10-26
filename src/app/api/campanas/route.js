@@ -12,8 +12,8 @@ export const POST = guard(async (request, _ctx, session) => {
   if (!productIds || !productIds.length) return bad('Elige al menos un producto.')
   const dev = b && b.devolucionPct != null ? num(b.devolucionPct, { min: 0, max: 100 }) : undefined
   if (b && b.devolucionPct != null && dev == null) return bad('El % de devolución debe estar entre 0 y 100.')
-  const [r] = await sql`INSERT INTO campaigns (owner_id, name, product_ids) VALUES (${session.userId}, ${nombre}, ${productIds}) RETURNING id`
-  if (dev !== undefined) await sql`UPDATE campaigns SET return_pct = ${dev} WHERE id = ${r.id} AND owner_id = ${session.userId}`
-  await logActivity(session.userId, `Creaste la campaña «${nombre}»`)
+  const [r] = await sql`INSERT INTO campaigns (owner_id, name, product_ids) VALUES (${session.ownerId}, ${nombre}, ${productIds}) RETURNING id`
+  if (dev !== undefined) await sql`UPDATE campaigns SET return_pct = ${dev} WHERE id = ${r.id} AND owner_id = ${session.ownerId}`
+  await logActivity(session.ownerId, `Creaste la campaña «${nombre}»`)
   return ok({ id: String(r.id) }, 201)
 })
