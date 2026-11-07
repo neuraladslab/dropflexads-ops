@@ -1,4 +1,4 @@
-import { guard, ok, bad, isId } from '@/lib/http'
+import { guard, ok, bad, isId, readBody } from '@/lib/http'
 import { copiesDe, generarCopies } from '@/lib/ia/copies'
 
 export const runtime = 'nodejs'
@@ -17,9 +17,10 @@ export const GET = guard(async (_request, { params }, session) => {
 })
 
 /** Genera 5 copies nuevos (reemplazan los anteriores) con la IA de la persona. */
-export const POST = guard(async (_request, { params }, session) => {
+export const POST = guard(async (request, { params }, session) => {
   const { id } = await params
   if (!isId(id)) return bad('Creativo no válido.')
-  const r = await generarCopies(session.ownerId, Number(id))
+  const body = (await readBody(request)) || {}
+  const r = await generarCopies(session.ownerId, Number(id), typeof body.detalle === 'string' ? body.detalle : '')
   return r.ok ? ok(r) : Response.json({ error: r.error, code: r.codigo }, { status: HTTP[r.codigo] || 502 })
 })

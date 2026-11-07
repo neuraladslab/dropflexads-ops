@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Dialogo from '@/components/Dialogo'
-import { LIMITES } from '@/domain/copies.ts'
+import { LIMITES, MAX_DETALLE } from '@/domain/copies.ts'
 
 // Los 5 copies de Meta Ads de un creativo (texto principal, título y descripción), escritos por la IA con las fórmulas AIDA y PAS y revisados contra las normas de Meta.
-async function llamar(method, id) {
-  const res = await fetch(`/api/creativos/${id}/copies`, { method, headers: { 'content-type': 'application/json' }, body: method === 'POST' ? '{}' : undefined })
+async function llamar(method, id, detalle = '') {
+  const res = await fetch(`/api/creativos/${id}/copies`, { method, headers: { 'content-type': 'application/json' }, body: method === 'POST' ? JSON.stringify({ detalle }) : undefined })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw Object.assign(new Error(data.error || 'No se pudo completar.'), { code: data.code })
   return data
@@ -45,11 +45,11 @@ function Tarjeta({ c }) {
 }
 
 export default function CopiesCreativo({ creativo, autoGenerar = false, onCerrar, onCambio }) {
-  const [copies, setCopies] = useState(null), [generando, setGenerando] = useState(false), [error, setError] = useState(null)
+  const [detalle, setDetalle] = useState(''), [copies, setCopies] = useState(null), [generando, setGenerando] = useState(false), [error, setError] = useState(null)
   const generar = useCallback(async () => {
     setError(null); setGenerando(true)
-    try { const r = await llamar('POST', creativo.id); setCopies(r.copies); if (onCambio) onCambio() } catch (e) { setError({ mensaje: e.message, codigo: e.code }) } finally { setGenerando(false) }
-  }, [creativo.id, onCambio])
+    try { const r = await llamar('POST', creativo.id, detalle); setCopies(r.copies); if (onCambio) onCambio() } catch (e) { setError({ mensaje: e.message, codigo: e.code }) } finally { setGenerando(false) }
+  }, [creativo.id, onCambio, detalle])
   useEffect(() => {
     let vivo = true
     llamar('GET', creativo.id).then((r) => { if (!vivo) return; setCopies(r.copies); if (!r.copies.length && autoGenerar) generar() }).catch((e) => { if (vivo) { setCopies([]); setError({ mensaje: e.message, codigo: e.code }) } })
@@ -61,6 +61,11 @@ export default function CopiesCreativo({ creativo, autoGenerar = false, onCerrar
       <h2 style={{ margin: '0 0 4px' }}>Copies para Meta Ads</h2>
       <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13, wordBreak: 'break-all' }}>{creativo.nombre}</div>
       <div className="muted" style={{ fontSize: 13.5, margin: '2px 0 14px' }}>{creativo.angulo} · {creativo.formato === 'video' ? 'Video' : 'Imagen'}. Escritos con las fórmulas AIDA y PAS y revisados contra las normas de Meta; aun así, léelos antes de publicar.</div>
+      <label className="cp-detalle">
+        <span className="cp-eti"><span>Detalle para la IA <span className="muted" style={{ fontWeight: 400 }}>(opcional)</span></span><span className="cp-cuenta">{[...detalle].length}/{MAX_DETALLE}</span></span>
+        <textarea value={detalle} maxLength={MAX_DETALLE} rows={3} disabled={generando} onChange={(e) => setDetalle(e.target.value)} placeholder="Ej.: público mujeres 35-55, tono cercano y tranquilo; destacar que viene con envío contra entrega; mencionar la presentación de 60 cápsulas; evitar hablar de precio." />
+        <span className="muted" style={{ fontSize: 12.5 }}>Cuéntale a la IA lo que sabes del público, el tono, los beneficios u ofertas. Las normas de Meta siguen aplicando.</span>
+      </label>
       <div className="cp-wrap" aria-live="polite">
         {copies === null && <p className="muted">Cargando…</p>}
         {generando && <div className="tint blue"><b style={{ color: 'var(--blue)' }}>Claude está escribiendo tus 5 copies…</b><div style={{ fontSize: 14, marginTop: 2 }}>Tarda cerca de 30 segundos. Puedes dejar esta ventana abierta.</div></div>}
