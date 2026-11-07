@@ -6,7 +6,7 @@ import { estadoValido, driveUrlLimpia } from '@/domain/creativos.ts'
 export const runtime = 'nodejs'
 
 /** PATCH {estado?, driveUrl?, gancho?, notas?, metaAdId?}. El nombre, el ángulo, el formato y la versión no se editan (el nombre es la llave con Meta y Drive).
- *  No hay DELETE: lo que ya no se usa se archiva, y el historial queda. */
+ *  Lo que ya no se usa se puede archivar (el historial queda) o eliminar con DELETE. */
 export const PATCH = guard(async (request, ctx, session) => {
   const { id } = await ctx.params
   if (!isId(id)) return bad('Creativo no válido.', 404)
@@ -38,5 +38,15 @@ export const PATCH = guard(async (request, ctx, session) => {
               updated_at = NOW()
             WHERE id = ${Number(id)} AND owner_id = ${session.ownerId}`
   await logActivity(session.ownerId, `Cambiaste el creativo ${act.name}${estado && estado !== act.status ? `: de ${act.status} a ${estado}` : ` (${campos.join(', ')})`}`)
+  return ok({ ok: true })
+})
+
+/** Elimina el creativo y sus copies (cascada). El gasto de Meta no se toca: vive en su propia tabla y solo deja de enlazarse a este nombre. */
+export const DELETE = guard(async (_request, ctx, session) => {
+  const { id } = await ctx.params
+  if (!isId(id)) return bad('Creativo no válido.', 404)
+  const [gone] = await sql`DELETE FROM creatives WHERE id = ${Number(id)} AND owner_id = ${session.ownerId} RETURNING name`
+  if (!gone) return bad('No encontré ese creativo.', 404)
+  await logActivity(session.ownerId, `Eliminaste el creativo ${gone.name}`)
   return ok({ ok: true })
 })

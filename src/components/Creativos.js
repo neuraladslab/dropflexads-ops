@@ -75,7 +75,11 @@ function Nuevo({ d, onCerrar, onCreado, campanaFija }) {
 function Editar({ c, sinEnlazar, onCerrar }) {
   const router = useRouter()
   const [drive, setDrive] = useState(c.drive || ''), [gancho, setGancho] = useState(c.gancho || ''), [notas, setNotas] = useState(c.notas || ''), [ad, setAd] = useState(c.metaAdId || '')
-  const [error, setError] = useState(''), [env, setEnv] = useState(false)
+  const [error, setError] = useState(''), [env, setEnv] = useState(false), [confirmar, setConfirmar] = useState(false)
+  async function eliminar() {
+    setError(''); setEnv(true)
+    try { await api('DELETE', `/api/creativos/${c.id}`); router.refresh(); onCerrar() } catch (ex) { setError(ex.message); setEnv(false) }
+  }
   async function guardar(e) {
     e.preventDefault(); setError(''); setEnv(true)
     try { await api('PATCH', `/api/creativos/${c.id}`, { driveUrl: drive, gancho, notas, metaAdId: ad }); router.refresh(); onCerrar() } catch (ex) { setError(ex.message) } finally { setEnv(false) }
@@ -96,7 +100,9 @@ function Editar({ c, sinEnlazar, onCerrar }) {
           </select>
           <span className="hint">Lo ideal es nombrar el anuncio en Meta igual que el creativo; así se enlaza solo.</span></div>
         {error && <span className="errm full" role="alert">{error}</span>}
-        <div className="fbar full"><button className="btn ghost" type="button" onClick={onCerrar}>Cancelar</button><button className="btn" type="submit" disabled={env}>Guardar</button></div>
+        {confirmar && <div className="tint warn full" role="alertdialog" aria-label="Confirmar eliminación"><b style={{ color: 'var(--gold-ink)' }}>¿Eliminar este creativo?</b><div style={{ fontSize: 14, marginTop: 2 }}>Se borra de la campaña junto con sus copies y no se puede deshacer. Si solo ya no lo usas, mejor cambia su estado a archivado.</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}><button className="btn ghost sm" type="button" onClick={() => setConfirmar(false)} disabled={env}>No, conservar</button><button className="btn danger sm" type="button" onClick={eliminar} disabled={env}>{env ? 'Eliminando…' : 'Sí, eliminar'}</button></div></div>}
+        <div className="fbar full">{!confirmar && <button className="btn danger" type="button" onClick={() => setConfirmar(true)} disabled={env} style={{ marginRight: 'auto' }}>Eliminar</button>}<button className="btn ghost" type="button" onClick={onCerrar}>Cancelar</button><button className="btn" type="submit" disabled={env}>Guardar</button></div>
       </form>
     </Dialogo>
   )
