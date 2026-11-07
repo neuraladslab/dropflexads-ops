@@ -11,7 +11,10 @@ export const LIMITES = { principalVisible: 125, principal: 600, titulo: 40, desc
 
 export type Copy = { formula: Formula; principal: string; titulo: string; descripcion: string };
 export type CopyRevisado = Copy & { avisos: string[] };
-export type ContextoCopy = { campana: string; productos: string[]; angulo: string; formato: string; gancho: string | null };
+export type ContextoCopy = { campana: string; productos: string[]; angulo: string; formato: string; gancho: string | null; detalle?: string | null;
+  /** Títulos y descripciones ya usados en otros creativos de la misma campaña: tampoco se pueden repetir. */ usados?: { titulos: string[]; descripciones: string[] } };
+/** Máximo de caracteres del detalle que escribe la persona para orientar a la IA. */
+export const MAX_DETALLE = 800;
 
 const sinTildes = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const EMOJI = /\p{Extended_Pictographic}/gu;
@@ -39,8 +42,8 @@ export function revisarCopy(c: Copy, ctx: ContextoCopy): string[] {
   const avisos: string[] = [];
   const todo = `${c.principal}\n${c.titulo}\n${c.descripcion}`, plano = sinTildes(todo);
   for (const r of REGLAS) if (r.re.test(plano)) avisos.push(r.motivo);
-  // Cifras: solo las que ya están en el contexto de la persona (precios, porcentajes, años de «rejuvenecer»… se inventan fácil).
-  const permitidas = numerosDe([ctx.campana, ...ctx.productos, ctx.angulo, ctx.gancho ?? ""].join(" "));
+  // Cifras: solo las que ya están en el contexto de la persona (incluido su detalle; precios, porcentajes, años de «rejuvenecer»… se inventan fácil).
+  const permitidas = numerosDe([ctx.campana, ...ctx.productos, ctx.angulo, ctx.gancho ?? "", ctx.detalle ?? ""].join(" "));
   const sobran = [...numerosDe(todo)].filter((n) => !permitidas.has(n));
   if (sobran.length) avisos.push(`Usa cifras que no están en tus datos (${sobran.slice(0, 3).join(", ")}).`);
   // Forma.
@@ -77,4 +80,26 @@ export function leerCopies(texto: string): { ok: true; copies: Copy[] } | { ok: 
   return { ok: true, copies: copies.slice(0, CANTIDAD_COPIES) };
 }
 
-export const revisarTodos = (copies: Copy[], ctx: ContextoCopy): CopyRevisado[] => copies.map((c) => ({ ...c, avisos: revisarCopy(c, ctx) }));
+/** Para comparar títulos/descripciones: sin tildes, sin emojis ni signos, en minúsculas. */
+const clave = (s: string) => sinTildes(s).replace(EMOJI, "").replace(/[^a-z0-9ñ ]/g, " ").replace(/\s+/g, " ").trim();
+
+/** Meta penaliza el contenido repetido: el título y la descripción de cada copy deben ser distintos a los de los otros copies. */
+export function avisosRepetidos(copies: Copy[], usados?: { titulos: string[]; descripciones: string[] }): string[][] {
+  const visto = { titulo: new Map<string, number>(), descripcion: new Map<string, number>() };
+  const previos = { titulo: new Set((usados?.titulos ?? []).map(clave)), descripcion: new Set((usados?.descripciones ?? []).map(clave)) };
+  return copies.map((c, i) => {
+    const avisos: string[] = [];
+    for (const campo of ["titulo", "descripcion"] as const) {
+      const k = clave(c[campo]), antes = visto[campo].get(k);
+      if (k && previos[campo].has(k)) avisos.push(`${campo === "titulo" ? "El título" : "La descripción"} ya se usa en otro creativo de la campaña: escribe ${campo === "titulo" ? "uno" : "una"} nuev${campo === "titulo" ? "o" : "a"}.`);
+      else if (k && antes !== undefined) avisos.push(`${campo === "titulo" ? "El título" : "La descripción"} repite el del copy ${antes + 1}: cada copy necesita ${campo === "titulo" ? "un título" : "una descripción"} distint${campo === "titulo" ? "o" : "a"}.`);
+      else if (k) visto[campo].set(k, i);
+    }
+    return avisos;
+  });
+}
+
+export const revisarTodos = (copies: Copy[], ctx: ContextoCopy): CopyRevisado[] => {
+  const rep = avisosRepetidos(copies, ctx.usados);
+  return copies.map((c, i) => ({ ...c, avisos: [...new Set([...revisarCopy(c, ctx), ...rep[i]])] }));
+};

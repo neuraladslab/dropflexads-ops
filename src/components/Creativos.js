@@ -66,7 +66,7 @@ function Nuevo({ d, onCerrar, onCreado, campanaFija }) {
           </div>
         </details>
         {error && <span className="errm full" role="alert">{error}</span>}
-        <div className="fbar full"><button className="btn ghost" type="button" onClick={onCerrar}>Cancelar</button><button className="btn" type="submit" disabled={env || !nombre || !angulo.trim()}>Crear y generar copies</button></div>
+        <div className="fbar full"><button className="btn ghost" type="button" onClick={onCerrar}>Cancelar</button><button className="btn" type="submit" disabled={env || !nombre || !angulo.trim()}>Crear creativo</button></div>
       </form>
     </Dialogo>
   )
@@ -297,7 +297,7 @@ export default function Creativos({ d, campanaFija = null }) {
           <p className="muted" style={{ fontSize: 13.5 }}>Estos anuncios gastaron pero su nombre no coincide con ningún creativo. Crea el creativo con el mismo nombre del anuncio, renombra el anuncio en Meta, o enlázalo a mano desde «Editar».</p>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>{d.sinEnlazar.map((a) => <li key={a.id}><span style={{ fontFamily: 'ui-monospace, monospace' }}>{a.nombre || '(sin nombre)'}</span> · {cop(a.gasto)} · último gasto {diaCorto(a.ultimoDia)}</li>)}</ul></details>
       )}
-      {nuevo && <Nuevo d={d} campanaFija={campanaFija} onCerrar={() => setNuevo(false)} onCreado={(c) => { setNuevo(false); setCopies({ creativo: c, auto: true }) }} />}
+      {nuevo && <Nuevo d={d} campanaFija={campanaFija} onCerrar={() => setNuevo(false)} onCreado={() => setNuevo(false)} />}
       {copies && <CopiesCreativo creativo={copies.creativo} autoGenerar={copies.auto} onCerrar={() => setCopies(null)} onCambio={() => router.refresh()} />}
       {editando && <Editar c={editando} sinEnlazar={d.sinEnlazar} onCerrar={() => setEditando(null)} />}
     </>

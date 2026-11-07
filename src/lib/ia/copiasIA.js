@@ -2,10 +2,12 @@
 import { leerCopies, revisarTodos } from '../../domain/copies.ts'
 import { SISTEMA_COPIES, mensajeCopies, mensajeCorreccion } from './sistemaCopies.js'
 
+/** Rondas de corrección tras la primera tanda: el aviso de títulos/descripciones repetidos se insiste hasta que no quede ninguno. */
+export const RONDAS_CORRECCION = 3
 const textoDe = (content) => content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim()
 
 /**
- * Hasta 3 llamadas: la primera; una segunda si la respuesta no se pudo leer; y una de corrección si algún copy rompe una norma (una sola vez).
+ * Hasta 6 llamadas: la primera; una segunda si la respuesta no se pudo leer; y hasta 3 de corrección mientras algún copy rompa una norma o repita título/descripción.
  * Devuelve { copies: [{formula, principal, titulo, descripcion, avisos}], llamadas, rechazada? }. Lo que siga con avisos tras la corrección se entrega marcado, no se oculta.
  */
 export async function pedirCopies({ client, modelo, contexto, alUsar, antesDeLlamar }) {
@@ -28,11 +30,15 @@ export async function pedirCopies({ client, modelo, contexto, alUsar, antesDeLla
     msgs.push({ role: 'user', content: `Tu respuesta no se pudo usar (${leido.error}). Responde SOLO con el JSON pedido, con los 5 copies.` })
   }
   if (!ultimo) return { copies: [], llamadas, ilegible: true }
-  const malos = ultimo.map((c, i) => ({ n: i + 1, avisos: c.avisos })).filter((p) => p.avisos.length)
-  if (malos.length) {
+  const total = (l) => l.reduce((a, c) => a + c.avisos.length, 0)
+  for (let ronda = 0; ronda < RONDAS_CORRECCION; ronda++) {
+    const malos = ultimo.map((c, i) => ({ n: i + 1, avisos: c.avisos })).filter((p) => p.avisos.length)
+    if (!malos.length) break
     msgs.push({ role: 'user', content: mensajeCorreccion(malos) })
     const r = await llamar()
-    if (!r.rechazada) { const leido = leerCopies(r.texto); if (leido.ok) { const nuevo = revisarTodos(leido.copies, contexto); if (nuevo.reduce((a, c) => a + c.avisos.length, 0) <= ultimo.reduce((a, c) => a + c.avisos.length, 0)) ultimo = nuevo } }
+    if (r.rechazada) break
+    const leido = leerCopies(r.texto)
+    if (leido.ok) { const nuevo = revisarTodos(leido.copies, contexto); if (total(nuevo) <= total(ultimo)) ultimo = nuevo }
   }
   return { copies: ultimo, llamadas }
 }

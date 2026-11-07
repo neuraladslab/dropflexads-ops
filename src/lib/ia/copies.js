@@ -5,6 +5,7 @@ import { setSetting } from '@/lib/settings'
 import { logActivity } from '@/lib/activity'
 import { lockedSeconds, recordFailure, throttleKey } from '@/lib/auth/session'
 import { sumarUso, topeAlcanzado, mesDe, costoUsd } from '@/domain/ia.ts'
+import { MAX_DETALLE } from '@/domain/copies.ts'
 import { estadoIA, clienteDe, explicarError } from './asistente'
 import { pedirCopies } from './copiasIA'
 
@@ -26,11 +27,12 @@ async function contextoDe(uid, c) {
     for (const r of await sql`SELECT product_ids, product_names FROM dropi_orders WHERE owner_id = ${uid} AND product_ids && ${ids}::text[] LIMIT 300`) (r.product_ids || []).forEach((id, i) => { if (ids.includes(id) && (r.product_names || [])[i]) nombres.set(id, r.product_names[i]) })
     for (const r of await sql`SELECT product_id, name FROM dropi_products WHERE owner_id = ${uid} AND product_id = ANY(${ids})`.catch(() => [])) if (!nombres.has(r.product_id)) nombres.set(r.product_id, r.name)
   }
-  return { campana: (camp && camp.name) || c.campaign_label, productos: [...nombres.values()].slice(0, 6), angulo: c.angle, formato: c.format, gancho: c.hook }
+  const usados = c.campaign_id ? await sql`SELECT k.headline, k.description FROM creative_copies k JOIN creatives x ON x.id = k.creative_id WHERE x.campaign_id = ${c.campaign_id} AND x.owner_id = ${uid} AND k.owner_id = ${uid} AND k.creative_id <> ${c.id} LIMIT 60` : []
+  return { usados: { titulos: [...new Set(usados.map((u) => u.headline))].slice(0, 30), descripciones: [...new Set(usados.map((u) => u.description))].slice(0, 30) }, campana: (camp && camp.name) || c.campaign_label, productos: [...nombres.values()].slice(0, 6), angulo: c.angle, formato: c.format, gancho: c.hook }
 }
 
 /** → { ok, copies, avisos, costoUsd } | { ok:false, codigo, error }. Nunca lanza por la IA; reemplaza los copies anteriores solo si la nueva tanda llegó completa. */
-export async function generarCopies(uid, creativoId) {
+export async function generarCopies(uid, creativoId, detalle = '') {
   const [c] = await sql`SELECT id, campaign_id, campaign_label, angle, format, hook FROM creatives WHERE id = ${creativoId} AND owner_id = ${uid}`
   if (!c) return { ok: false, codigo: 'datos', error: 'No encontré ese creativo.' }
   const mes = mesDe(), est = await estadoIA(uid), cfg = est.config
@@ -42,7 +44,7 @@ export async function generarCopies(uid, creativoId) {
   const client = await clienteDe(uid)
   if (!client) return { ok: false, codigo: 'sin_clave', error: 'No se pudo leer la clave guardada. Vuelve a guardarla en Configuración → Inteligencia artificial.' }
 
-  const contexto = await contextoDe(uid, c), usos = [], gastado = () => usos.reduce((a, u) => a + costoUsd(cfg.modelo, u), 0)
+  const contexto = { ...(await contextoDe(uid, c)), detalle: String(detalle || '').trim().slice(0, MAX_DETALLE) || null }, usos = [], gastado = () => usos.reduce((a, u) => a + costoUsd(cfg.modelo, u), 0)
   const guardarUso = async () => { let uso = est.uso; for (const u of usos) uso = sumarUso(uso, mes, cfg.modelo, u); if (usos.length) await setSetting(uid, 'ia_uso', JSON.stringify(uso)).catch(() => {}); return uso }
   try {
     const r = await pedirCopies({ client, modelo: cfg.modelo, contexto, alUsar: (u) => usos.push(u), antesDeLlamar: () => { if (est.uso.usd + gastado() >= cfg.topeUsd) throw Object.assign(new Error('tope'), { tope: true }) } })

@@ -1007,6 +1007,8 @@ details.vz-det[open]>summary::before{content:"▾ "}
 
 /* Copies de Meta Ads */
 .cp-wrap{min-width:0}
+.cp-detalle{display:grid;gap:6px;margin:0 0 14px}
+.cp-detalle textarea{width:100%;resize:vertical;font-size:14.5px;line-height:1.45;padding:10px 12px;border:1px solid var(--line);background:#fff}
 .cp-lista{display:grid;gap:12px}
 .cp-card{display:grid;gap:14px;padding:18px!important;min-width:0}
 .cp-dos>*{min-width:0}
